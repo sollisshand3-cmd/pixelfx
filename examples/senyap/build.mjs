@@ -20,4 +20,12 @@ const html = await readFile(new URL("index.html", here), "utf8");
 await writeFile(new URL("dist/index.html", here), html);
 const single = html.replace('<script type="module" src="./game.js"></script>', () => `<script type="module">\n${js.replace(/<\/script/gi, "<\\/script")}\n</script>`);
 await writeFile(new URL("dist/senyap.html", here), single);
+// the same page without its document wrapper, for hosts that add their own (a claude.ai artifact)
+const bare = single
+  .replace(/<!doctype html>\s*/i, "")
+  .replace(/<\/?html[^>]*>\s*/gi, "")
+  .replace(/<\/?head>\s*/gi, "")
+  .replace(/<\/?body>\s*/gi, "")
+  .replace(/<meta (charset|name="viewport")[^>]*>\s*/gi, "");
+await writeFile(new URL("dist/senyap.embed.html", here), bare);
 console.log(`dist/senyap.html  ${(single.length / 1024).toFixed(0)} KB`);

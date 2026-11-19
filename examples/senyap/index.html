@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SENYAP Game Seram</title>
+<title>SENYAP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
@@ -13,11 +13,9 @@
     --dim: #7a7064;
     --blood: #c8201c;
     --teal: #7ef0dc;
-    --panel: rgba(6, 4, 4, 0.82);
+    /* the game is a dark place whatever the system theme says */
+    color-scheme: dark;
   }
-  /* the game is a dark place whatever the system theme says */
-  :root[data-theme="light"], :root[data-theme="dark"] { --bg: #000; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #000; } }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
@@ -48,9 +46,9 @@
   #knob { position: absolute; left: 30px; top: 30px; width: 36px; height: 36px; border-radius: 50%; background: rgba(216, 208, 192, 0.3); }
   .tbtn { position: fixed; font: inherit; font-size: 20px; color: var(--ink); background: rgba(0,0,0,0.4); border: 2px solid rgba(216,208,192,0.35); border-radius: 50%; width: 68px; height: 68px; }
   .tbtn.on { background: rgba(200, 32, 28, 0.5); }
-  #lightBtn { right: 16px; bottom: 100px; }
-  #runBtn { right: 96px; bottom: 28px; }
-  #pauseBtn { right: 16px; top: 16px; width: 48px; height: 48px; border-radius: 6px; }
+  #lightBtn { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+  #runBtn { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+  #pauseBtn { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); width: 48px; height: 48px; border-radius: 6px; }
   @media (max-height: 520px) { .how { margin: 8px auto; } .tips { display: none; } h1 { font-size: 64px; } .tag { margin-bottom: 8px; } }
 </style>
 </head>
