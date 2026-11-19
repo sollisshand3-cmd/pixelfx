@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SENYAP Game Seram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000;
+    --ink: #d8d0c0;
+    --dim: #7a7064;
+    --blood: #c8201c;
+    --teal: #7ef0dc;
+    --panel: rgba(6, 4, 4, 0.82);
+  }
+  /* the game is a dark place whatever the system theme says */
+  :root[data-theme="light"], :root[data-theme="dark"] { --bg: #000; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #000; } }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font-family: "VT323", ui-monospace, monospace; font-size: 22px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #game canvas, #hud, #fxscreen { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #hud, #fxscreen { pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.35), rgba(0,0,0,0.92) 70%); }
+  .screen[hidden] { display: none; }
+  .card { max-width: 560px; width: 100%; text-align: center; }
+  h1 { font-weight: 400; font-size: clamp(64px, 18vw, 132px); letter-spacing: 0.18em; margin: 0 0 4px; color: var(--ink); text-shadow: 3px 0 var(--blood), -2px 0 #1b3a8a; animation: flick 6s infinite steps(1); }
+  h2 { font-weight: 400; font-size: clamp(44px, 12vw, 72px); letter-spacing: 0.12em; margin: 0 0 8px; color: var(--blood); text-shadow: 2px 2px #000; }
+  .tag { color: var(--blood); font-size: 26px; margin: 0 0 22px; letter-spacing: 0.06em; }
+  p { margin: 0 0 12px; line-height: 1.15; }
+  .story { color: var(--ink); }
+  .how { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; text-align: left; margin: 18px auto; width: fit-content; max-width: 100%; color: var(--dim); }
+  .how b { color: var(--ink); font-weight: 400; }
+  .tips { color: var(--dim); font-size: 19px; border-top: 1px solid #2a2420; padding-top: 12px; margin-top: 8px; }
+  .tips span { color: var(--teal); }
+  button.go { font: inherit; font-size: 30px; letter-spacing: 0.2em; color: var(--ink); background: transparent; border: 2px solid var(--blood); padding: 8px 34px 6px; margin-top: 14px; cursor: pointer; }
+  button.go:hover, button.go:focus-visible { background: var(--blood); color: #000; outline: none; }
+  .small { font-size: 18px; color: var(--dim); margin-top: 14px; }
+  @keyframes flick { 0%, 100% { opacity: 1; } 41% { opacity: 0.4; } 42% { opacity: 1; } 77% { opacity: 0.7; } 78% { opacity: 1; } }
+  /* touch controls */
+  #touch { position: fixed; inset: 0; }
+  #touch[hidden] { display: none; }
+  #stick { position: fixed; width: 100px; height: 100px; border: 2px solid rgba(216, 208, 192, 0.25); border-radius: 50%; pointer-events: none; }
+  #stick[hidden] { display: none; }
+  #knob { position: absolute; left: 30px; top: 30px; width: 36px; height: 36px; border-radius: 50%; background: rgba(216, 208, 192, 0.3); }
+  .tbtn { position: fixed; font: inherit; font-size: 20px; color: var(--ink); background: rgba(0,0,0,0.4); border: 2px solid rgba(216,208,192,0.35); border-radius: 50%; width: 68px; height: 68px; }
+  .tbtn.on { background: rgba(200, 32, 28, 0.5); }
+  #lightBtn { right: 16px; bottom: 100px; }
+  #runBtn { right: 96px; bottom: 28px; }
+  #pauseBtn { right: 16px; top: 16px; width: 48px; height: 48px; border-radius: 6px; }
+  @media (max-height: 520px) { .how { margin: 8px auto; } .tips { display: none; } h1 { font-size: 64px; } .tag { margin-bottom: 8px; } }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<canvas id="hud"></canvas>
+<canvas id="fxscreen" width="320" height="180"></canvas>
+
+<div id="touch" hidden>
+  <div id="stick" hidden><div id="knob"></div></div>
+  <button class="tbtn" id="lightBtn">LAMPU</button>
+  <button class="tbtn" id="runBtn">LARI</button>
+  <button class="tbtn" id="pauseBtn">II</button>
+</div>
+
+<section class="screen" id="title">
+  <div class="card">
+    <h1>SENYAP</h1>
+    <p class="tag">Jangan bersuara. Ia sedang mendengar.</p>
+    <p class="story">Kamu tersedar di dalam rumah usang yang tiada penghujung. Kutip <span style="color:var(--teal)">5 azimat bercahaya</span> untuk membuka pintu keluar, sebelum <span style="color:var(--blood)">Bayang</span> menemui kamu.</p>
+    <div class="how desk">
+      <b>WASD</b><span>bergerak</span>
+      <b>Tetikus</b><span>lihat sekeliling</span>
+      <b>Shift</b><span>lari (bising!)</span>
+      <b>F</b><span>hidup / matikan lampu suluh</span>
+    </div>
+    <div class="how mob">
+      <b>Kiri</b><span>seret untuk bergerak</span>
+      <b>Kanan</b><span>seret untuk melihat</span>
+      <b>LARI · LAMPU</b><span>butang di kanan</span>
+    </div>
+    <p class="tips"><span>Suluh</span> Bayang tepat ke mukanya untuk melambatkan dan menghalaunya, tetapi bateri cepat habis. Mata yang terapung akan memberitahu di mana kamu. Lampu yang hidup membuat kamu mudah dilihat.</p>
+    <button class="go" id="startBtn">MASUK</button>
+    <p class="small">Pakai fon kepala. Bunyi adalah separuh daripada ketakutan.</p>
+  </div>
+</section>
+
+<section class="screen" id="pause" hidden>
+  <div class="card">
+    <h2>JEDA</h2>
+    <p class="story">Ia masih di sana. Menunggu.</p>
+    <button class="go" id="resumeBtn">SAMBUNG</button>
+  </div>
+</section>
+
+<section class="screen" id="dead" hidden>
+  <div class="card">
+    <h2>KAMU DITANGKAP</h2>
+    <p class="story" id="deadTime"></p>
+    <p class="tag">Bayang tidak pernah lapar lama.</p>
+    <button class="go" id="retryBtn">CUBA LAGI</button>
+  </div>
+</section>
+
+<section class="screen" id="win" hidden>
+  <div class="card">
+    <h2 style="color:var(--teal)">KAMU TERLEPAS</h2>
+    <p class="story">Pintu berdentum di belakang kamu. Udara malam terasa sejuk dan bersih.</p>
+    <p class="tag" id="winTime"></p>
+    <p class="small">Tetapi rumah itu masih di sana. Dan ia masih lapar.</p>
+    <button class="go" id="againBtn">MAIN LAGI</button>
+  </div>
+</section>
+
+<script type="module" src="./game.js"></script>
+</body>
+</html>

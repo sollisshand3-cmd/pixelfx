@@ -1,0 +1,16 @@
+{
+  "name": "senyap",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SENYAP: a first-person pixel horror game built with three.js and pixelfx.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  }
+}
