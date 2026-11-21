@@ -765,7 +765,7 @@ export class Hotel {
     this.sprite(eyeballFx, { seed: Math.round(x * 3), iris: RED_IRIS, hover: 30 }, 1 / 55, this.pos(fid, x, y, 0));
   }
   hands(fid, x, y) {
-    this.sprite(graspingHands, { seed: 3 }, 1 / 70, this.pos(fid, x, y, 0.5), this.oneShots);
+    this.sprite(graspingHands, { seed: 3, palette: ["#050102", "#140305", "#2e060a", "#520a10", "#801420", "#b02626", "#e05a48", "#ffc8b8"] }, 1 / 70, this.pos(fid, x, y, 0.5), this.oneShots);
   }
   burst(pos, palette) {
     this.sprite(collectBurst, { seed: 2, palette }, 1 / 70, pos, this.oneShots);

@@ -92,6 +92,13 @@
   .sub.line { color: #ffe0c8; }
   .sub.whisper { color: #c8201c; background: transparent; letter-spacing: 0.4em; font-size: 26px; }
   .card > .ghost { align-self: center; }
+  /* the earphones card, first thing on every visit */
+  .phones { color: var(--brass); align-self: center; animation: pulse 1.6s ease-in-out infinite; }
+  .eartitle { color: var(--ink); letter-spacing: 0.16em; }
+  .earlines { display: grid; gap: 6px; text-align: left; width: fit-content; max-width: 100%; margin: 0 auto; }
+  .earlines b { color: var(--brass); font-weight: 400; margin-right: 8px; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.06); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .phones { animation: none; } }
   .real { color: #6a5a50; font-size: 18px; font-style: italic; }
   #popup { position: fixed; top: calc(14% + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; background: rgba(0,0,0,0.75); border: 1px solid var(--brass); padding: 6px 18px 4px; }
   #popup.show { animation: pop 3.2s ease-out both; }
@@ -194,7 +201,28 @@
   </div>
 </div>
 
-<section class="screen" id="title">
+<section class="screen" id="ear">
+  <div class="card">
+    <svg class="phones" viewBox="0 0 64 56" width="120" height="105" aria-hidden="true">
+      <path d="M8 34 V28 A24 24 0 0 1 56 28 V34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square"/>
+      <rect x="4" y="32" width="12" height="20" fill="currentColor"/>
+      <rect x="48" y="32" width="12" height="20" fill="currentColor"/>
+      <rect x="16" y="36" width="3" height="12" fill="currentColor" opacity="0.5"/>
+      <rect x="45" y="36" width="3" height="12" fill="currentColor" opacity="0.5"/>
+    </svg>
+    <h2 class="eartitle">PAKAI EARPHONE</h2>
+    <p class="sub1">WEAR EARPHONES</p>
+    <div class="earlines">
+      <p lang="ms"><b>BM</b> Pakai earphone. Bayang didengar sebelum ia dilihat.</p>
+      <p lang="en"><b>EN</b> Wear earphones. Bayang is heard before it is seen.</p>
+      <p lang="id"><b>ID</b> Pakai earphone. Bayang terdengar sebelum terlihat.</p>
+    </div>
+    <p class="small" data-i18n="ui.ear.tip"></p>
+    <button class="go" id="earBtn" data-i18n="ui.ear.ok">I'M READY</button>
+  </div>
+</section>
+
+<section class="screen" id="title" hidden>
   <div class="card">
     <h1>SENYAP</h1>
     <p class="sub1" data-i18n="ui.tagline">THE NIGHT HOTEL</p>

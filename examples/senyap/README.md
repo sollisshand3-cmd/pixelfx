@@ -82,6 +82,24 @@ hidden while empty.
 - **The story** (`src/data/story.js`) scripts each night through a small API: tasks, timers, phone calls,
   room reports, items, keys, lights, doors and Bayang's appearances.
 
+## Earphones
+
+The game opens on a card that asks you to wear earphones, in all three languages; its button is also what
+lets the browser start sound. Bayang is meant to be heard before it is seen: its cloth drag and breathing are
+placed in 3D and muffled through walls and floors, and that only works in earphones.
+
+## Promo clips
+
+`?trailer` turns the game into its own film crew: `src/main.js` steps the real game one fixed frame at a time
+through a scripted cut (the earphones card, the lobby in the rain, the CCTV finding it on floor 3, a call from
+an empty room, the doorway of 209, the bathroom of 207, room 317, the lift that talks, the chase, the
+jumpscare, the title), and the sound engine renders the same synthesized audio offline in step with the
+frames. Titles are translated like everything else.
+
+```bash
+tools/make-trailer.sh ms     # or en, id -> promo/senyap-trailer-ms.mp4 (16:9) and -vertical.mp4 (9:16)
+```
+
 ## Build
 
 ```bash

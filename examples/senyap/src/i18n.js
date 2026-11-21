@@ -472,6 +472,19 @@ const D = {
   "you": ["You", "Kamu", "Kamu"],
 
 
+  // the trailer's titles
+  "tr.ear1": ["WEAR EARPHONES", "PAKAI EARPHONE", "PAKAI EARPHONE"],
+  "tr.ear2": ["for the full experience", "untuk merasai pengalaman sebenar", "untuk merasakan pengalaman sebenarnya"],
+  "tr.l1": ["Hotel Seri Malam.", "Hotel Seri Malam.", "Hotel Seri Malam."],
+  "tr.l2": ["Closed since the fire of 1989.", "Ditutup sejak kebakaran 1989.", "Tutup sejak kebakaran 1989."],
+  "tr.l3": ["Seven nights. One guard.", "Tujuh malam. Seorang pengawal.", "Tujuh malam. Satu satpam."],
+  "tr.l4": ["Calls from rooms that should be empty.", "Panggilan dari bilik yang sepatutnya kosong.", "Telepon dari kamar yang seharusnya kosong."],
+  "tr.l5": ["It hears every step you take.", "Ia mendengar setiap langkah kamu.", "Ia mendengar setiap langkahmu."],
+  "tr.l6": ["Room 317 doesn't exist.", "Bilik 317 tidak wujud.", "Kamar 317 tidak ada."],
+  "tr.f1": ["7 NIGHTS · 3 LANGUAGES · 3D SOUND", "7 MALAM · 3 BAHASA · BUNYI 3D", "7 MALAM · 3 BAHASA · SUARA 3D"],
+  "tr.f2": ["Play now in your browser.", "Main sekarang di pelayar.", "Main sekarang di browser."],
+  "ui.ear.ok": ["I'M READY", "SAYA SEDIA", "SAYA SIAP"],
+  "ui.ear.tip": ["Turn the volume up. Find a quiet room. Lights off, if you dare.", "Kuatkan bunyi. Cari bilik yang sunyi. Tutup lampu, jika berani.", "Besarkan volume. Cari kamar yang sunyi. Matikan lampu, kalau berani."],
   // ---------------------------------------------------------------- objectives against the clock
   "s.notActive": ["Not yet. First: {task}.", "Belum lagi. Dahulukan: {task}.", "Belum. Selesaikan dulu: {task}."],
   "s.missed1": ["Objective missed. The hotel noticed.", "Objektif terlepas. Hotel ini perasan.", "Objektif terlewat. Hotel ini menyadarinya."],

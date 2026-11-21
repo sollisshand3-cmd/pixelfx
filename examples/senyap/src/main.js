@@ -1126,9 +1126,21 @@ const timer = new THREE.Timer();
 timer.connect(document);
 let fearV = 0, timeScale = 1;
 
-renderer.setAnimationLoop(() => {
-  timer.update();
-  const dt = Math.min(0.05, timer.getDelta()) * timeScale, now = timer.getElapsed();
+// ?trailer: the game is stepped one fixed frame at a time by the trailer director, and sound renders offline
+const TRAILER = new URLSearchParams(location.search).has("trailer");
+let vclock = 0, noBeam = false;
+function frame(fixed) {
+  let dt, now;
+  if (fixed) {
+    dt = fixed;
+    vclock += fixed;
+    now = vclock;
+    sound.advance(now);
+  } else {
+    timer.update();
+    dt = Math.min(0.05, timer.getDelta()) * timeScale;
+    now = timer.getElapsed();
+  }
   post.uniforms.time.value = now;
   for (let i = subsQueue.length - 1; i >= 0; i--) {
     const s = subsQueue[i];
@@ -1165,7 +1177,7 @@ renderer.setAnimationLoop(() => {
       x: P.x,
       z: P.z,
       light: P.light && P.battery > 0,
-      beam: P.light && P.battery > 0 && P.mode === "walk",
+      beam: P.light && P.battery > 0 && P.mode === "walk" && !noBeam,
       hidden: !!P.hidden,
       hideSpot: P.hidden,
       camera,
@@ -1359,7 +1371,8 @@ renderer.setAnimationLoop(() => {
   renderer.setRenderTarget(null);
   renderer.render(postScene, postCam);
   updateHud(dt);
-});
+}
+if (!TRAILER) renderer.setAnimationLoop(() => frame());
 
 // ---------------------------------------------------------------- HUD, in pixelfx's pixel font
 const C = { ink: hex("#d8d0c0"), dim: hex("#6a6258"), shadow: hex("#000000"), teal: hex("#7ef0dc"), red: hex("#ff3a2a"), amber: hex("#ffc23d"), green: hex("#9be05a"), cam: hex("#a8ffb0") };
@@ -1539,6 +1552,7 @@ document.addEventListener("pointerlockchange", () => {
   if (!document.pointerLockElement && state === "play" && !touch && P.mode !== "choose" && P.mode !== "read") pause();
 });
 function relock() {
+  if (TRAILER) return;
   if (!touch && state === "play" && !document.pointerLockElement) renderer.domElement.requestPointerLock?.()?.catch?.(() => {});
 }
 function pause() {
@@ -1798,7 +1812,14 @@ buildTitleHotel();
 night = NIGHTS[0];
 Object.assign(P, { floor: "G", x: 12.5 * T, z: 6.2 * T, yaw: 0, pitch: -0.05, mode: "walk" });
 refreshTitle();
-showScreen("title");
+// first, the earphones card; its button is also the gesture that lets sound start
+showScreen(TRAILER ? null : "ear");
+$("earBtn").addEventListener("click", () => {
+  sound.start();
+  sound.setVolume(settings.volume);
+  sound.play("heart", null, { k: 0.6 });
+  showScreen("title");
+});
 (function titleSpin() {
   if (state === "title") {
     P.yaw = Math.sin(performance.now() / 9000) * 0.6;
@@ -1846,3 +1867,240 @@ window.__hotel = {
     timeScale = v;
   },
 };
+
+
+// ---------------------------------------------------------------- the trailer director (?trailer)
+// Drives the real game, one fixed frame at a time, through a scripted cut: the shots below set the camera,
+// the hotel and Bayang, and the game does the rest (lights, effects, AI, captions, the jumpscare).
+if (TRAILER) {
+  const FPS = 30, DUR = 58;
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("lang")) setLang(qs.get("lang"));
+  applyStatic();
+  buildTitleHotel();
+  const ov = document.createElement("div");
+  ov.id = "trailer";
+  ov.style.cssText = "position:fixed;inset:0;z-index:50;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:VT323,monospace;color:#d8d0c0;text-align:center;padding:24px";
+  document.body.appendChild(ov);
+  const PHONES = document.querySelector(".phones").outerHTML;
+  sound.startOffline(DUR + 1);
+  sound.setVolume(0.9);
+  settings.subs = true;
+  const lookYaw = (fx, fy, tx, ty) => Math.atan2(-(tx - fx), -(ty - fy));
+  const cam = (f, x, y, yaw, pitch = 0) => Object.assign(P, { floor: f, x: x * T, z: y * T, yaw, pitch, mode: "walk", hidden: null });
+  const fade = (T, a, b, edge = 0.5) => clamp(Math.min((T - a) / edge, (b - T) / edge));
+  const card = (html, op, bg = "transparent", justify = "center") => {
+    if (ov.dataset.html !== html) {
+      ov.innerHTML = html;
+      ov.dataset.html = html;
+    }
+    ov.style.opacity = op;
+    ov.style.background = bg;
+    ov.style.justifyContent = justify;
+  };
+  const lower = (text) => `<p style="font-size:44px;letter-spacing:0.06em;text-shadow:0 0 12px #000,2px 2px 0 #000;margin:0 0 70px">${text}</p>`;
+  const hud = (on) => (hudCanvas.style.visibility = on ? "visible" : "hidden");
+  const clearStory = () => {
+    tasks = [];
+    timers = [];
+    handlers = {};
+    pending = 0;
+    for (const r of Object.values(ringing)) r.handle.stop();
+    ringing = {};
+    for (const q of subsQueue) q.el.remove();
+    subsQueue = [];
+  };
+  const once = {};
+  const at = (key, T, t0) => (T >= t0 && !once[key] ? (once[key] = true) : false);
+  let caughtAt = null;
+
+  const SHOTS = [
+    // 0: black, earphones, a heartbeat
+    { at: 0, enter() {
+        startNight(5);
+        clearStory();
+        bayang.mode = "off";
+        clockStopped = "03:17";
+        hud(false);
+        cam("G", 16.2, 8.5, lookYaw(16.2, 8.5, 11.5, 2), 0.02);
+        P.light = false;
+      }, tick(T) {
+        card(`${PHONES}<h1 style="font-size:84px;margin:0;letter-spacing:0.16em">${t("tr.ear1")}</h1><p style="font-size:30px;color:#d8a850;margin:0">${t("tr.ear2")}</p>`, fade(T, 0.3, 4.3, 0.6), "#000");
+        for (const b of [1.0, 2.0, 3.0, 3.5]) if (at("hb" + b, T, b)) sound.play("heart", null, { k: 0.9 });
+      } },
+    // 1: the lobby in the rain, a slow push in; the counter bell rings for nobody
+    { at: 4.5, enter() {
+        post.uniforms.dark.value = 1;
+      }, tick(T) {
+        const k = clamp(T / 6);
+        cam("G", lerp(16.2, 13.4, k), lerp(8.5, 5.8, k), lookYaw(lerp(16.2, 13.4, k), lerp(8.5, 5.8, k), 11.5, 2), 0.02);
+        card(T < 3 ? lower(t("tr.l1")) : lower(t("tr.l2")), T < 3 ? fade(T, 0.4, 2.9, 0.4) : fade(T, 3.0, 5.9, 0.4), "transparent", "flex-end");
+        if (at("bell", T, 3.6)) sfx("bell", "bell");
+      } },
+    // 2: the CCTV, cutting between cameras to the thing on floor 3
+    { at: 10.5, enter() {
+        hud(true);
+        cam("G", 2.7, 2.2, 0, -0.1);
+        P.mode = "cctv";
+        cctvIdx = 0;
+        bayang.cfg.active = true;
+        bayang.staticFigure("3", 24, 5.5);
+        bayang.timer = 99;
+      }, tick(T) {
+        const idx = T < 1.4 ? 0 : T < 2.8 ? 2 : 5;
+        if (idx !== cctvIdx) {
+          cctvIdx = idx;
+          sound.play("click");
+        }
+        const c = hotel.cameras[5].cam.position;
+        bayang.heading = Math.atan2(c.x - bayang.x, c.z - bayang.z);
+        card(lower(t("tr.l3")), fade(T, 0.5, 4.3, 0.4), "transparent", "flex-end");
+      } },
+    // 3: the post phone rings; a room that should be empty is calling
+    { at: 15, enter() {
+        bayang.mode = "off";
+        cam("G", 2.9, 3.0, lookYaw(2.9, 3.0, 1.45, 1.5), -0.32);
+        P.light = true;
+        ctx.ring("phone_pos", () => {
+          speak([["salmah", "n2.c1", "phone"], ["salmah", "n2.c2", "phone"]], null);
+          ctx.task("r207", "n2.task", { urgent: true, limit: 999 });
+        });
+      }, tick(T) {
+        if (at("answer", T, 2.2)) answer("phone_pos");
+        P.yaw = lookYaw(2.9, 3.0, 1.45, 1.5) + Math.sin(T * 0.7) * 0.02;
+        card(lower(t("tr.l4")), fade(T, 0.4, 2.1, 0.3), "transparent", "flex-end");
+      } },
+    // 4: floor 2 with the flashlight; the lights stop humming; something stands in the doorway of 209
+    { at: 20.5, enter() {
+        scene.fog.density = 0.05;
+        for (const q of subsQueue) q.el.remove();
+        subsQueue = [];
+        cam("2", 15.2, 5.5, -Math.PI / 2, 0);
+      }, tick(T, dt) {
+        if (T < 3.2) {
+          P.x += 1.5 * dt;
+          P.bob += 1.5 * dt * 2.9;
+          if (Math.floor(T / 0.55) !== Math.floor((T - dt) / 0.55)) sound.play("step", null, { run: false });
+        }
+        if (at("hum", T, 2.4)) {
+          humOn = false;
+          ctx.caption("cap.humStops");
+        }
+        if (at("glimpse", T, 3.0)) {
+          bayang.glimpse({ floor: "2", at: [23.5, 4.55], look: [12, 5.5], exit: [23.5, 3.2], hold: 3 });
+          sound.play("stinger");
+        }
+        card(lower(t("tr.l5")), T > 5.2 ? fade(T, 5.3, 7.0, 0.3) : 0, "transparent", "flex-end");
+      } },
+    // 5: the bathroom of 207: the light stutters, the curtain moves, hands come up out of the tub
+    { at: 27.5, enter() {
+        scene.fog.density = 0.075;
+        humOn = true;
+        bayang.mode = "off";
+        cam("2", 19.7, 3.6, lookYaw(19.7, 3.6, 19.5, 1.4), -0.22);
+        hotel.setLight("bath207", 3);
+        hotel.flicker("bath207", true);
+        hotel.curtain("207", true);
+        hud(false);
+      }, tick(T) {
+        P.yaw = lookYaw(19.7, 3.6, 19.5, 1.4) + Math.sin(T * 0.5) * 0.03;
+        if (at("hands", T, 1.6)) ctx.hands("2", 19.55, 2.25);
+        card("", 0);
+      } },
+    // 6: room 317, which isn't on any plan
+    { at: 32.5, enter() {
+        hotel.reveal("317");
+        hotel.setLight("r317", 4.5);
+        hotel.flicker("r317", true);
+        hotel.eye("3", 26.6, 3.2);
+        hotel.eye("3", 28.4, 2.6);
+        hotel.candle("3", 27.0, 3.6, 0);
+        cam("3", 27.6, 3.9, lookYaw(27.6, 3.9, 27.0, 1.4), -0.12);
+      }, tick(T) {
+        const k = T / 4;
+        cam("3", 27.6 - k * 0.2, 3.9 - k * 0.5, lookYaw(27.6, 3.9, 27.0, 1.4), -0.12);
+        if (at("w317", T, 1.0)) sound.play("whisper", null, { vol: 0.5 });
+        card(lower(t("tr.l6")), fade(T, 0.6, 3.8, 0.4), "transparent", "flex-end");
+      } },
+    // 7: the lift arrives by itself; the voice moves from the speaker into the empty cabin
+    { at: 36.5, enter() {
+        cam("G", 21.3, 3.5, Math.PI / 2 * -1 + 0, 0.06);
+        P.yaw = lookYaw(21.3, 3.5, 24.5, 3.5);
+      }, tick(T) {
+        const k = T / 5;
+        cam("G", 21.3 + k * 0.8, 3.5, lookYaw(21.3, 3.5, 24.5, 3.5), 0.06);
+        if (at("lift", T, 0.3)) ctx.liftArrive("G");
+        if (at("v1", T, 1.3)) speak([["salmah", "n5.l1", "speaker"]], where({ floor: "G", x: 24.2, y: 3.5, h: 2.5 }));
+        if (at("v2", T, 3.2)) speak([["salmah", "n5.l2", "near"]], where({ floor: "G", x: 24.6, y: 3.5, h: 1.6 }));
+        card("", 0);
+      } },
+    // 8: it sees you: backing down the corridor as it comes, faster than you
+    { at: 41.5, enter() {
+        scene.fog.density = 0.06;
+        hud(true);
+        clearStory();
+        cam("2", 14, 5.5, -Math.PI / 2, 0.02);
+        P.light = true;
+        noBeam = true;
+        bayang.cfg = { ...bayang.cfg, active: true, floors: ["2"], speed: 6.2 };
+        bayang.place("2", 21, 5.5);
+        bayang.mode = "chase";
+        bayang.knows = 30;
+        bayang.heading = -Math.PI / 2;
+        threat = 3;
+      }, tick(T, dt) {
+        if (state === "play") {
+          P.x -= 3.6 * dt;
+          P.bob += 3.6 * dt * 2.4;
+          if (Math.floor(T / 0.33) !== Math.floor((T - dt) / 0.33)) sound.play("step", null, { run: true });
+          bayang.knows = 30;
+        }
+        if (state === "caught" && caughtAt === null) caughtAt = T;
+        card("", 0);
+      } },
+    // 9: the title, over the silence after the scream
+    { at: 99, enter() {
+        hud(false);
+      }, tick(T) {
+        const flick = T < 1.2 ? (Math.random() < 0.3 ? 0.2 : 1) : 1;
+        const html = `<h1 style="font-size:150px;margin:0;letter-spacing:0.18em;text-shadow:5px 0 #c8201c,-3px 0 #1b3a8a;opacity:${flick}">SENYAP</h1>
+          <p style="font-size:38px;color:#d8a850;letter-spacing:0.4em;margin:0">${t("ui.tagline")}</p>
+          <p style="font-size:30px;margin:18px 0 0;opacity:${clamp((T - 1.6) / 0.6)}">${t("tr.f1")}</p>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:22px;opacity:${clamp((T - 2.6) / 0.6)}"><span style="transform:scale(0.55);display:inline-block;margin:-30px">${PHONES}</span><span style="font-size:40px;letter-spacing:0.14em">${t("tr.ear1")}</span></div>
+          <p style="font-size:30px;color:#7ef0dc;margin:6px 0 0;opacity:${clamp((T - 3.6) / 0.6)}">${t("tr.f2")}</p>`;
+        ov.innerHTML = html;
+        ov.dataset.html = "";
+        ov.style.opacity = Math.min(1, T / 0.25, (DUR - S9 - T) / 0.8);
+        ov.style.background = "#000";
+        ov.style.justifyContent = "center";
+        if (at("ring", T, 4.6)) {
+          const h = sound.ring(null);
+          sound.later(() => h.stop(), 2.2);
+        }
+      } },
+  ];
+  let S9 = 49;
+  let cur = -1;
+  window.__trailer = {
+    FPS,
+    DUR,
+    frames: Math.round(DUR * FPS),
+    step(i) {
+      const Tg = i / FPS, dt = 1 / FPS;
+      // the last shot starts when the jumpscare has cut to black (or at 50 s whatever happens)
+      if (cur === 8 && ((caughtAt !== null && caughtT > 2.6) || Tg > 51)) {
+        S9 = Tg;
+        SHOTS[9].at = Tg;
+      }
+      let n = 0;
+      for (let k = 0; k < SHOTS.length; k++) if (Tg >= SHOTS[k].at) n = k;
+      if (n !== cur) {
+        cur = n;
+        SHOTS[n].enter();
+      }
+      SHOTS[n].tick(Tg - SHOTS[n].at, dt);
+      frame(dt);
+    },
+    audio: () => sound.renderWav(),
+  };
+}

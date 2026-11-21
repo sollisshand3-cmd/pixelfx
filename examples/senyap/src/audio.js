@@ -7,14 +7,69 @@ export class Sound {
     this.ctx = null;
     this.volume = 0.9;
     this.loops = new Map();
+    // offline mode (for recording the trailer): time is the game's, not the clock's
+    this.offline = false;
+    this.offset = 0;
+    this.queue = [];
   }
 
   start() {
     if (this.ctx) {
-      this.ctx.resume();
+      if (!this.offline) this.ctx.resume();
       return;
     }
-    const ctx = (this.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    this.init(new (window.AudioContext || window.webkitAudioContext)());
+  }
+
+  /** Render `seconds` of sound offline instead of playing it: the game steps time with advance(). */
+  startOffline(seconds, rate = 44100) {
+    this.offline = true;
+    this.init(new OfflineAudioContext(2, Math.ceil(seconds * rate), rate));
+  }
+  advance(t) {
+    this.offset = t;
+    const due = this.queue.filter((q) => q.at <= t);
+    this.queue = this.queue.filter((q) => q.at > t);
+    for (const q of due) q.fn();
+  }
+  /** setTimeout, on the game's clock when offline. */
+  later(fn, sec) {
+    if (!this.offline) return setTimeout(fn, sec * 1000);
+    const q = { at: this.offset + sec, fn };
+    this.queue.push(q);
+    return q;
+  }
+  cancel(h) {
+    if (!this.offline) clearTimeout(h);
+    else this.queue = this.queue.filter((q) => q !== h);
+  }
+  /** The finished offline render as a 16-bit stereo WAV, base64. */
+  async renderWav() {
+    const buf = await this.ctx.startRendering();
+    const n = buf.length, ch = [buf.getChannelData(0), buf.getChannelData(1)];
+    const out = new DataView(new ArrayBuffer(44 + n * 4));
+    const w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+    w(0, "RIFF");
+    out.setUint32(4, 36 + n * 4, true);
+    w(8, "WAVEfmt ");
+    out.setUint32(16, 16, true);
+    out.setUint16(20, 1, true);
+    out.setUint16(22, 2, true);
+    out.setUint32(24, buf.sampleRate, true);
+    out.setUint32(28, buf.sampleRate * 4, true);
+    out.setUint16(32, 4, true);
+    out.setUint16(34, 16, true);
+    w(36, "data");
+    out.setUint32(40, n * 4, true);
+    for (let i = 0, o = 44; i < n; i++) for (let c = 0; c < 2; c++, o += 2) out.setInt16(o, Math.max(-1, Math.min(1, ch[c][i])) * 32767, true);
+    const bytes = new Uint8Array(out.buffer);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  init(ctx) {
+    this.ctx = ctx;
     this.master = ctx.createGain();
     this.master.gain.value = this.volume;
     const comp = ctx.createDynamicsCompressor();
@@ -48,10 +103,10 @@ export class Sound {
     this.master.gain.setTargetAtTime(this.volume * k, this.t, tc);
   }
   suspend() {
-    this.ctx?.suspend();
+    if (!this.offline) this.ctx?.suspend();
   }
   get t() {
-    return this.ctx.currentTime;
+    return this.offline ? this.offset : this.ctx.currentTime;
   }
 
   out(node, wet = 0.2) {
@@ -612,6 +667,7 @@ export class Sound {
   /** A phone ringing at dest until stop() is called; each ring calls onRing. */
   ring(dest, onRing) {
     if (!this.ctx) return { stop() {} };
+    const snd = this;
     let alive = true, timer;
     const once = () => {
       if (!alive) return;
@@ -636,13 +692,13 @@ export class Sound {
         o.stop(t + 1.1);
       }
       onRing?.();
-      timer = setTimeout(once, 3000);
+      timer = this.later(once, 3);
     };
     once();
     return {
       stop() {
         alive = false;
-        clearTimeout(timer);
+        snd.cancel(timer);
       },
     };
   }
