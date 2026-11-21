@@ -311,7 +311,7 @@ export const NIGHTS = [
       ctx.on("cctv:k3", () => {
         if (ctx.isDone("cctv")) return;
         ctx.done("cctv");
-        ctx.bayang.staticFigure("3", 20, 5.5);
+        ctx.bayang.staticFigure("3", 25, 5.5);
         ctx.after(1.2, () => ctx.say("Di hujung Tingkat 3, sesuatu memandang tepat ke kamera.", 3.5));
         ctx.after(4, () => {
           ctx.task("lift", "Periksa lif di Lobi");
@@ -370,8 +370,8 @@ export const NIGHTS = [
           ctx.flicker("r317", true);
           ctx.eyes([["3", 26.6, 3.2], ["3", 28.4, 2.6]]);
           ctx.candles([["3", 27.0, 3.6, 0]]);
-          ctx.item({ id: "note5", kind: "note", floor: "3", x: 26.9, y: 1.7, h: 0.5, note: "din5" });
-          ctx.item({ id: "tag", kind: "note", floor: "3", x: 28.55, y: 3.35, h: 0.62, note: "salmah", label: "Tanda nama" });
+          ctx.item({ id: "note5", kind: "note", floor: "3", x: 26.8, y: 2.85, h: 0.02, note: "din5" });
+          ctx.item({ id: "tag", kind: "note", floor: "3", x: 27.9, y: 3.7, h: 0.02, note: "salmah", label: "Ambil tanda nama" });
         },
         resolve: () => {
           ctx.say("Telefon di 317 hangus. Gagangnya masih suam.", 3.5);

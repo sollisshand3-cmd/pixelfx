@@ -509,6 +509,8 @@ function startNight(n, { fromCheckpoint = false } = {}) {
   for (const l of Object.values(loops)) l.stop();
   hotel = new Hotel(scene);
   hotel.buildRain();
+  for (const q of subsQueue) q.el.remove();
+  subsQueue = [];
   tasks = [];
   timers = [];
   handlers = {};
@@ -572,7 +574,9 @@ function findFocus() {
     const to = new THREE.Vector3(dx, dy * 0.5, dz).normalize(), dot = to.dot(fwd);
     if (dot < (d < 0.9 ? -0.2 : 0.55)) continue;
     const s = dot * 2 - d * 0.6;
-    if (s > score && (it.kind === "door" || hotel.clearLine(P.floor, P.x, P.z, it.pos.x + Math.sign(-dx) * 0.3, it.pos.z + Math.sign(-dz) * 0.3) || d < 1.3)) {
+    // a clear line to just in front of the thing (not its middle, which may be inside a wardrobe)
+    const k = Math.min(0.85, Math.max(0, d - 0.25)) / (d || 1);
+    if (s > score && (it.kind === "door" || d < 1.3 || hotel.clearLine(P.floor, P.x, P.z, it.pos.x - dx * k, it.pos.z - dz * k))) {
       score = s;
       best = it;
     }
@@ -975,14 +979,20 @@ function placeCamera() {
   camera.rotation.set(P.pitch, P.yaw, Math.sin(P.bob * 0.5) * 0.008);
 }
 
+// the security cameras see in infrared: less fog, a flat grey light over everything
+function nightVision(on) {
+  scene.fog.density = on ? 0.03 : 0.075;
+  hemi.intensity = on ? 2.2 : 0.42;
+}
+
 // ---------------------------------------------------------------- the loop
 const timer = new THREE.Timer();
 timer.connect(document);
-let fearV = 0;
+let fearV = 0, timeScale = 1;
 
 renderer.setAnimationLoop(() => {
   timer.update();
-  const dt = Math.min(0.05, timer.getDelta()), now = timer.getElapsed();
+  const dt = Math.min(0.05, timer.getDelta()) * timeScale, now = timer.getElapsed();
   post.uniforms.time.value = now;
   for (let i = subsQueue.length - 1; i >= 0; i--) {
     const s = subsQueue[i];
@@ -1126,8 +1136,10 @@ renderer.setAnimationLoop(() => {
     hotel.liveScreen.visible = false;
     const fl = flashlight.intensity;
     flashlight.intensity = 0;
+    nightVision(true);
     renderer.setRenderTarget(monitorRT);
     renderer.render(scene, cam.cam);
+    nightVision(false);
     flashlight.intensity = fl;
     bayang.g.visible = bv;
     hotel.liveScreen.visible = true;
@@ -1141,7 +1153,9 @@ renderer.setAnimationLoop(() => {
   if (P.mode === "cctv") {
     const fl = flashlight.intensity;
     flashlight.intensity = 0;
+    nightVision(true);
     renderer.render(scene, hotel.cameras[cctvIdx].cam);
+    nightVision(false);
     flashlight.intensity = fl;
   } else renderer.render(scene, camera);
   post.uniforms.tDiffuse.value = rt.texture;
@@ -1181,6 +1195,8 @@ function updateHud(dt) {
       }
       p.text(touch ? "TUKAR KAMERA DI BAWAH" : "A / D TUKAR KAMERA - E KELUAR", W / 2, H - 14, C.cam, { align: "center", shadow: C.shadow });
     } else {
+      // looking out through the slats of a wardrobe
+      if (P.mode === "hide") for (let yy = 0; yy < H; yy += 9) p.rect(0, yy, W, 5, C.shadow, 0.92);
       p.text(`MALAM ${night.n}`, 8, 7, C.ink, { shadow: C.shadow });
       p.text(clockText(), 8 + p.measure(`MALAM ${night.n}`)[0] + 6, 7, clockStopped ? C.red : C.dim, { shadow: C.shadow });
       // objectives: what's left, and what just got done
@@ -1213,8 +1229,6 @@ function updateHud(dt) {
         p.rect(bx, by + bh + 3, Math.round((bw * P.stamina) / 100), 2, C.ink, 0.8);
       }
       if (P.mode === "hide") {
-        // looking out through the slats
-        for (let yy = 0; yy < H; yy += 9) p.rect(0, yy, W, 5, C.shadow, 0.92);
         p.text(touch ? "GUNA - KELUAR" : "E - KELUAR", W / 2, H - 30, C.ink, { align: "center", outline: C.shadow });
       } else if (P.mode === "walk" && focus) {
         const txt = (touch ? "GUNA - " : "E - ") + promptFor(focus).toUpperCase();
@@ -1509,5 +1523,8 @@ window.__hotel = {
   },
   set clock(v) {
     clockMin = v;
+  },
+  set speed(v) {
+    timeScale = v;
   },
 };

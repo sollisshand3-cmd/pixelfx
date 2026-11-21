@@ -167,7 +167,7 @@ function floor2() {
     // the laundry
     ...[11.1, 12.05, 13.0, 13.95].map((x, i) => ({ kind: "washer", id: i === 1 ? "washer" : undefined, x0: x, x1: x + 0.9, y0: 9.35, y1: 9.97, h: 0.95, collide: true, label: i === 1 ? "Mesin basuh" : undefined })),
     { kind: "cart", x0: 11.6, x1: 12.5, y0: 7.9, y1: 8.5, h: 1.15, collide: true, sight: true },
-    { kind: "cart", x0: 13.5, x1: 14.4, y0: 7.6, y1: 8.2, h: 1.15, collide: true, sight: true },
+    { kind: "cart", x0: 13.9, x1: 14.8, y0: 8.4, y1: 9.0, h: 1.15, collide: true, sight: true },
     { kind: "wardrobe", id: "linen_dobi", x0: 14.3, x1: 14.95, y0: 7.05, y1: 7.6, h: 2.0, face: "w", collide: true, sight: true, hide: true },
     { kind: "punch", id: "punch_2", x: 20.5, y: 5.03, face: "s", h: 1.3, label: "Jam rondaan" },
     { kind: "sign", text: "DOBI", x: 12.6, y: 5.97, face: "n", h: 2.4, w: 0.5 },
