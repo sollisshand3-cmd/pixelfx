@@ -2,87 +2,219 @@
 <html lang="ms">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SENYAP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SENYAP · Hotel Malam</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
+  /* Layout: full-screen game, with menus as one scrollable card over it. A night hotel: near-black, brass, old blood. */
   :root {
     --bg: #000;
     --ink: #d8d0c0;
-    --dim: #7a7064;
+    --dim: #8a8070;
+    --faint: #3a342c;
     --blood: #c8201c;
+    --brass: #d8a850;
     --teal: #7ef0dc;
-    /* the game is a dark place whatever the system theme says */
+    --paper: #d8ccb0;
+    --paper-ink: #2a2218;
+    --panel: rgba(8, 6, 5, 0.9);
+    --font: "VT323", ui-monospace, "SFMono-Regular", Menlo, monospace;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
-  body { font-family: "VT323", ui-monospace, monospace; font-size: 22px; touch-action: none; user-select: none; -webkit-user-select: none; }
-  #game canvas, #hud, #fxscreen { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
+  body { font-family: var(--font); font-size: 21px; line-height: 1.15; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #game canvas, #hud, #fxscreen { position: fixed; inset: 0; width: 100vw; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
   #hud, #fxscreen { pointer-events: none; }
-  .screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.35), rgba(0,0,0,0.92) 70%); }
-  .screen[hidden] { display: none; }
-  .card { max-width: 560px; width: 100%; text-align: center; }
-  h1 { font-weight: 400; font-size: clamp(64px, 18vw, 132px); letter-spacing: 0.18em; margin: 0 0 4px; color: var(--ink); text-shadow: 3px 0 var(--blood), -2px 0 #1b3a8a; animation: flick 6s infinite steps(1); }
-  h2 { font-weight: 400; font-size: clamp(44px, 12vw, 72px); letter-spacing: 0.12em; margin: 0 0 8px; color: var(--blood); text-shadow: 2px 2px #000; }
-  .tag { color: var(--blood); font-size: 26px; margin: 0 0 22px; letter-spacing: 0.06em; }
-  p { margin: 0 0 12px; line-height: 1.15; }
-  .story { color: var(--ink); }
-  .how { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; text-align: left; margin: 18px auto; width: fit-content; max-width: 100%; color: var(--dim); }
+  button { font: inherit; color: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  /* screens: one card, scrolls when the screen is short so the main button is never cut off */
+  .screen { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.4), rgba(0,0,0,0.94) 72%);
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .card { max-width: 580px; width: 100%; margin: auto; min-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 12px; text-align: center; padding-block: 8px; }
+  h1 { font-weight: 400; font-size: clamp(56px, 16vw, 120px); letter-spacing: 0.18em; margin: 0; line-height: 0.9; text-shadow: 3px 0 var(--blood), -2px 0 #1b3a8a; animation: flick 6s infinite steps(1); }
+  .sub1 { color: var(--brass); letter-spacing: 0.35em; font-size: 24px; margin: 0; }
+  h2 { font-weight: 400; font-size: clamp(40px, 11vw, 68px); letter-spacing: 0.12em; margin: 0; color: var(--blood); text-wrap: balance; }
+  .tag { color: var(--blood); font-size: 23px; margin: 0; letter-spacing: 0.04em; }
+  p { margin: 0; }
+  .story { color: var(--ink); text-wrap: pretty; }
+  .how { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; text-align: left; margin: 4px auto; width: fit-content; max-width: 100%; color: var(--dim); font-size: 19px; }
   .how b { color: var(--ink); font-weight: 400; }
-  .tips { color: var(--dim); font-size: 19px; border-top: 1px solid #2a2420; padding-top: 12px; margin-top: 8px; }
-  .tips span { color: var(--teal); }
-  button.go { font: inherit; font-size: 30px; letter-spacing: 0.2em; color: var(--ink); background: transparent; border: 2px solid var(--blood); padding: 8px 34px 6px; margin-top: 14px; cursor: pointer; }
-  button.go:hover, button.go:focus-visible { background: var(--blood); color: #000; outline: none; }
-  .small { font-size: 18px; color: var(--dim); margin-top: 14px; }
+  .go { font-size: 30px; letter-spacing: 0.18em; background: transparent; border: 2px solid var(--blood); padding: 8px 30px 6px; cursor: pointer; align-self: center; min-height: 48px; }
+  .go:hover, .go:focus-visible { background: var(--blood); color: #000; }
+  .ghost { background: transparent; border: 1px solid var(--faint); color: var(--dim); padding: 6px 16px 4px; cursor: pointer; font-size: 20px; min-height: 40px; }
+  .ghost:hover { color: var(--ink); border-color: var(--dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .small { font-size: 17px; color: var(--dim); }
+  .field { display: flex; gap: 10px; align-items: center; justify-content: center; color: var(--dim); font-size: 19px; flex-wrap: wrap; }
+  .field input[type=text] { font: inherit; font-size: 21px; background: #0e0c0a; color: var(--ink); border: 1px solid var(--faint); padding: 4px 8px; width: 12em; max-width: 100%; }
+  #nightPick { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  #nightPick button { width: 40px; height: 40px; background: #0e0c0a; border: 1px solid var(--faint); cursor: pointer; font-size: 22px; }
+  #nightPick button:disabled { opacity: 0.3; cursor: default; }
+  #nightPick button:not(:disabled):hover { border-color: var(--brass); color: var(--brass); }
+  #donate { border-top: 1px solid var(--faint); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  #donate a { color: var(--brass); font-size: 24px; text-decoration: none; border-bottom: 1px dashed var(--brass); padding: 6px 4px 2px; min-height: 44px; display: inline-flex; align-items: center; }
+  #donate p { font-size: 17px; color: var(--dim); max-width: 32em; }
   @keyframes flick { 0%, 100% { opacity: 1; } 41% { opacity: 0.4; } 42% { opacity: 1; } 77% { opacity: 0.7; } 78% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { h1 { animation: none; } #popup.show { animation: none; } }
+  @media (max-height: 600px) { .how, .long { display: none !important; } h1 { font-size: 56px; } .card { gap: 8px; } }
+
+  /* the day screen: a message on a phone, more or less */
+  .msg { background: #0e0c0a; border: 1px solid var(--faint); border-left: 3px solid var(--brass); padding: 12px 14px; text-align: left; white-space: pre-line; color: var(--ink); }
+  .from { color: var(--brass); font-size: 18px; text-align: left; margin-bottom: -6px; }
+  .hintbox { color: var(--teal); font-size: 19px; text-align: left; border: 1px dashed #2a5a52; padding: 8px 12px; }
+
+  /* the shift report: a form */
+  .report { background: var(--paper); color: var(--paper-ink); text-align: left; padding: 14px 16px; box-shadow: 0 0 0 1px #000, 6px 6px 0 rgba(0,0,0,0.6); transform: rotate(-0.4deg); }
+  .report h3 { margin: 0 0 8px; font-weight: 400; font-size: 26px; letter-spacing: 0.08em; border-bottom: 2px solid var(--paper-ink); }
+  .report dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px 14px; margin: 0 0 8px; }
+  .report dl div { display: flex; gap: 6px; border-bottom: 1px dotted #8a7a5a; min-width: 0; }
+  .report dt { color: #6a5a3a; }
+  .report dd { margin: 0; overflow-wrap: anywhere; }
+  .report ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  .report li b { font-weight: 400; display: block; text-decoration: underline; }
+  .report li span { display: block; }
+  .report li em { display: block; font-style: normal; color: #4a3a2a; }
+  .report li.obs { list-style: "· "; color: #4a3a2a; }
+  .twist { color: #9a0a0a; font-size: 26px; margin-top: 10px; transform: rotate(-2deg); letter-spacing: 0.05em; }
+  #repNote { color: var(--dim); font-size: 19px; }
+
+  /* in-game overlays */
+  #subs { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18% + env(safe-area-inset-bottom, 0px)); width: min(92vw, 760px); display: flex; flex-direction: column; gap: 4px; align-items: center; pointer-events: none; }
+  .sub { background: rgba(0,0,0,0.72); padding: 2px 10px 0; font-size: 23px; text-align: center; max-width: 100%; }
+  .sub.caption { color: #a8a090; font-size: 20px; }
+  .sub.say { color: var(--ink); }
+  .sub.self { color: #b8c8d8; font-style: italic; }
+  .sub.line { color: #ffe0c8; }
+  #popup { position: fixed; top: calc(14% + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; background: rgba(0,0,0,0.75); border: 1px solid var(--brass); padding: 6px 18px 4px; }
+  #popup.show { animation: pop 3.2s ease-out both; }
+  #popTitle { color: var(--brass); font-size: 30px; letter-spacing: 0.06em; }
+  #popSub { color: var(--dim); font-size: 20px; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -8px); } 8% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+  #hint { position: fixed; top: calc(26% + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); width: min(90vw, 520px); background: rgba(4, 16, 14, 0.85); border: 1px dashed #2a5a52; color: var(--teal); padding: 6px 12px 4px; text-align: center; pointer-events: none; font-size: 21px; }
+  #note, #chooser { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,0.55); }
+  .paper { background: var(--paper); color: var(--paper-ink); max-width: 480px; width: 100%; max-height: 86%; overflow-y: auto; padding: 16px 18px; box-shadow: 6px 6px 0 rgba(0,0,0,0.6); transform: rotate(0.6deg); text-align: left; }
+  .paper h3 { margin: 0 0 8px; font-weight: 400; font-size: 25px; border-bottom: 1px solid #8a7a5a; }
+  #noteText { white-space: pre-line; font-size: 22px; }
+  .paper .ghost { color: #4a3a2a; border-color: #8a7a5a; margin-top: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--faint); padding: 14px 16px; width: min(92vw, 380px); display: flex; flex-direction: column; gap: 8px; text-align: center; }
+  .panel h3 { margin: 0; font-weight: 400; color: var(--brass); font-size: 26px; letter-spacing: 0.1em; }
+  #chooserBtns { display: flex; flex-direction: column; gap: 6px; }
+  #chooserBtns button { background: #0e0c0a; border: 1px solid var(--faint); padding: 8px; cursor: pointer; font-size: 23px; min-height: 44px; }
+  #chooserBtns button:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
+  #chooserBtns button:disabled { opacity: 0.4; }
+  .settings { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; text-align: left; width: min(100%, 360px); margin: 0 auto; color: var(--dim); }
+  .settings input[type=range] { width: 100%; accent-color: var(--blood); }
+  .settings input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--blood); }
+
   /* touch controls */
-  #touch { position: fixed; inset: 0; }
-  #touch[hidden] { display: none; }
+  #touch { position: fixed; inset: 0; z-index: 5; }
+  #note, #chooser { z-index: 10; }
+  .screen { z-index: 20; }
   #stick { position: fixed; width: 100px; height: 100px; border: 2px solid rgba(216, 208, 192, 0.25); border-radius: 50%; pointer-events: none; }
-  #stick[hidden] { display: none; }
   #knob { position: absolute; left: 30px; top: 30px; width: 36px; height: 36px; border-radius: 50%; background: rgba(216, 208, 192, 0.3); }
-  .tbtn { position: fixed; font: inherit; font-size: 20px; color: var(--ink); background: rgba(0,0,0,0.4); border: 2px solid rgba(216,208,192,0.35); border-radius: 50%; width: 68px; height: 68px; }
+  .tbtn { position: fixed; font-size: 19px; background: rgba(0,0,0,0.42); border: 2px solid rgba(216,208,192,0.35); border-radius: 50%; width: 66px; height: 66px; }
   .tbtn.on { background: rgba(200, 32, 28, 0.5); }
-  #lightBtn { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
-  #runBtn { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+  #useBtn { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(108px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; border-color: rgba(216,168,80,0.7); }
+  #lightBtn { right: calc(100px + env(safe-area-inset-right, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  #runBtn { right: calc(100px + env(safe-area-inset-right, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   #pauseBtn { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); width: 48px; height: 48px; border-radius: 6px; }
-  @media (max-height: 520px) { .how { margin: 8px auto; } .tips { display: none; } h1 { font-size: 64px; } .tag { margin-bottom: 8px; } }
+  #cctvUI { position: fixed; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; gap: 12px; }
+  #cctvUI button { background: rgba(0,20,6,0.7); border: 1px solid #3a8a4a; color: #a8ffb0; min-width: 64px; min-height: 48px; font-size: 21px; }
 </style>
 </head>
-<body>
+<body data-donate="">
 <div id="game"></div>
 <canvas id="hud"></canvas>
 <canvas id="fxscreen" width="320" height="180"></canvas>
+<div id="subs" aria-live="polite"></div>
+<div id="popup" hidden><div id="popTitle"></div><div id="popSub"></div></div>
+<div id="hint" hidden><span id="hintText"></span></div>
+
+<div id="note" hidden>
+  <div class="paper" role="dialog" aria-labelledby="noteTitle">
+    <h3 id="noteTitle"></h3>
+    <div id="noteText"></div>
+    <button class="ghost" id="noteClose">Tutup (E)</button>
+  </div>
+</div>
+
+<div id="chooser" hidden>
+  <div class="panel" role="dialog" aria-labelledby="chooserTitle">
+    <h3 id="chooserTitle">Lif</h3>
+    <div id="chooserBtns"></div>
+    <span class="small" id="chooserHint"></span>
+    <button class="ghost" id="chooserCancel">Batal</button>
+  </div>
+</div>
 
 <div id="touch" hidden>
   <div id="stick" hidden><div id="knob"></div></div>
+  <button class="tbtn" id="useBtn">GUNA</button>
   <button class="tbtn" id="lightBtn">LAMPU</button>
   <button class="tbtn" id="runBtn">LARI</button>
-  <button class="tbtn" id="pauseBtn">II</button>
+  <button class="tbtn" id="pauseBtn" aria-label="Jeda">II</button>
+  <div id="cctvUI" hidden>
+    <button id="camPrev" aria-label="Kamera sebelum">&lt;</button>
+    <button id="camExit">KELUAR</button>
+    <button id="camNext" aria-label="Kamera seterusnya">&gt;</button>
+  </div>
 </div>
 
 <section class="screen" id="title">
   <div class="card">
     <h1>SENYAP</h1>
-    <p class="tag">Jangan bersuara. Ia sedang mendengar.</p>
-    <p class="story">Kamu tersedar di dalam rumah usang yang tiada penghujung. Kutip <span style="color:var(--teal)">5 azimat bercahaya</span> untuk membuka pintu keluar, sebelum <span style="color:var(--blood)">Bayang</span> menemui kamu.</p>
+    <p class="sub1">HOTEL MALAM</p>
+    <p class="story">Nama kamu sudah ditanda keluar. Cari jalan keluar melalui laluan servis sebelum Bayang menemui kamu.</p>
+    <p class="story long small">Tujuh malam sebagai pengawal keselamatan Hotel Seri Malam. Tekan jam rondaan, jawab laporan dari bilik yang sepatutnya kosong, dan tulis laporan sebelum pukul enam pagi.</p>
     <div class="how desk">
       <b>WASD</b><span>bergerak</span>
       <b>Tetikus</b><span>lihat sekeliling</span>
+      <b>E / klik</b><span>guna, buka pintu, jawab telefon, bersembunyi</span>
       <b>Shift</b><span>lari (bising!)</span>
-      <b>F</b><span>hidup / matikan lampu suluh</span>
+      <b>F</b><span>lampu suluh</span>
     </div>
     <div class="how mob">
       <b>Kiri</b><span>seret untuk bergerak</span>
       <b>Kanan</b><span>seret untuk melihat</span>
-      <b>LARI · LAMPU</b><span>butang di kanan</span>
+      <b>GUNA</b><span>buka, jawab, bersembunyi</span>
     </div>
-    <p class="tips"><span>Suluh</span> Bayang tepat ke mukanya untuk melambatkan dan menghalaunya, tetapi bateri cepat habis. Mata yang terapung akan memberitahu di mana kamu. Lampu yang hidup membuat kamu mudah dilihat.</p>
+    <div class="field"><label for="nameInput">Nama pada tag nama</label><input type="text" id="nameInput" maxlength="18" placeholder="Pengawal" autocomplete="off"></div>
     <button class="go" id="startBtn">MASUK</button>
-    <p class="small">Pakai fon kepala. Bunyi adalah separuh daripada ketakutan.</p>
+    <div id="nightRow" class="row" hidden><span class="small">Pilih malam:</span><div id="nightPick"></div></div>
+    <div id="donate" hidden>
+      <a id="donateLink" href="#" target="_blank" rel="noopener">Sokong pembangunan</a>
+      <p>Jika anda suka SENYAP, sumbangan anda membantu pembikinan bab dan audio baharu.</p>
+    </div>
+    <p class="small">Pakai fon kepala. Bunyi ialah separuh daripada ketakutan.</p>
+  </div>
+</section>
+
+<section class="screen" id="day" hidden>
+  <div class="card">
+    <h2 id="dayTitle">HARI 1</h2>
+    <p class="sub1" id="dayName"></p>
+    <p class="from" id="dayFrom"></p>
+    <p class="msg" id="dayText"></p>
+    <p class="hintbox" id="dayHint" hidden></p>
+    <button class="go" id="dayBtn">MULA SYIF</button>
+  </div>
+</section>
+
+<section class="screen" id="report" hidden>
+  <div class="card">
+    <div class="report">
+      <h3 id="repTitle">LAPORAN SYIF</h3>
+      <dl id="repMeta"></dl>
+      <ol id="repLog"></ol>
+      <p class="twist" id="repTwist" hidden></p>
+    </div>
+    <p id="repNote"></p>
+    <button class="go" id="repBtn">TERUSKAN</button>
   </div>
 </section>
 
@@ -90,26 +222,32 @@
   <div class="card">
     <h2>JEDA</h2>
     <p class="story">Ia masih di sana. Menunggu.</p>
+    <div class="settings">
+      <label for="volume">Volum</label><input type="range" id="volume" min="0" max="1" step="0.05">
+      <label for="sens">Kepekaan pandangan</label><input type="range" id="sens" min="0.4" max="2" step="0.1">
+      <label for="subsToggle">Sari kata bunyi</label><input type="checkbox" id="subsToggle">
+    </div>
     <button class="go" id="resumeBtn">SAMBUNG</button>
+    <div class="row"><button class="ghost" id="restartBtn">Mula semula malam ini</button><button class="ghost" id="menuBtn">Menu utama</button></div>
   </div>
 </section>
 
 <section class="screen" id="dead" hidden>
   <div class="card">
-    <h2>KAMU DITANGKAP</h2>
-    <p class="story" id="deadTime"></p>
-    <p class="tag">Bayang tidak pernah lapar lama.</p>
+    <h2 id="deadTitle">KAMU DITANGKAP</h2>
+    <p class="story" id="deadText"></p>
+    <p class="tag" id="deadTag"></p>
     <button class="go" id="retryBtn">CUBA LAGI</button>
+    <button class="ghost" id="deadMenuBtn">Menu utama</button>
   </div>
 </section>
 
-<section class="screen" id="win" hidden>
+<section class="screen" id="ending" hidden>
   <div class="card">
-    <h2 style="color:var(--teal)">KAMU TERLEPAS</h2>
-    <p class="story">Pintu berdentum di belakang kamu. Udara malam terasa sejuk dan bersih.</p>
-    <p class="tag" id="winTime"></p>
-    <p class="small">Tetapi rumah itu masih di sana. Dan ia masih lapar.</p>
-    <button class="go" id="againBtn">MAIN LAGI</button>
+    <h2 id="endTitle" style="color:var(--teal)">KAMU TERLEPAS</h2>
+    <p class="msg" id="endText"></p>
+    <p class="tag" id="endTeaser" style="white-space:pre-line"></p>
+    <button class="go" id="endBtn">MENU UTAMA</button>
   </div>
 </section>
 

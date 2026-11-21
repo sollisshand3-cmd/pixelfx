@@ -60,6 +60,22 @@ export class FxSprite {
     this.paint();
   }
 
+  /** The same live effect on a flat quad (a window, a wall), w x h metres, centred on the group. */
+  makeMesh(w, h) {
+    if (!this.meshMats)
+      this.meshMats = this.layers.map((l, i) =>
+        new THREE.MeshBasicMaterial({ map: l.texture, transparent: true, depthWrite: false, fog: true, blending: i ? THREE.AdditiveBlending : THREE.NormalBlending }),
+      );
+    const g = new THREE.Group(), geo = new THREE.PlaneGeometry(w, h);
+    this.meshMats.forEach((m, i) => {
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.position.z = i * 0.002;
+      mesh.renderOrder = 2 + i;
+      g.add(mesh);
+    });
+    return g;
+  }
+
   set opacity(v) {
     for (const l of this.layers) l.material.opacity = v;
   }
@@ -96,7 +112,7 @@ export class FxSprite {
     this.fx.update(dt);
     this.acc += dt;
     if (this.acc < REDRAW || !this.sprite.visible) return;
-    if (camera) {
+    if (camera && !this.always) {
       const d = this.sprite.position.distanceTo(camera.position);
       if (d > 22) return;
       const to = this.sprite.position.clone().sub(camera.position);

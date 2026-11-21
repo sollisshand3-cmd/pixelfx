@@ -4,14 +4,14 @@
 import * as THREE from "three";
 import { mulberry } from "./maze.js";
 
-function canvas(w, h) {
+export function canvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   return c;
 }
 
-function toTexture(c, repeat = false) {
+export function toTexture(c, repeat = false) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.magFilter = THREE.NearestFilter;
@@ -20,10 +20,10 @@ function toTexture(c, repeat = false) {
   return t;
 }
 
-const rgb = (r, g, b) => [r, g, b];
-const shade = ([r, g, b], k) => [r * k, g * k, b * k];
+export const rgb = (r, g, b) => [r, g, b];
+export const shade = ([r, g, b], k) => [r * k, g * k, b * k];
 
-function paint(w, h, seed, fn) {
+export function paint(w, h, seed, fn) {
   const c = canvas(w, h), ctx = c.getContext("2d"), img = ctx.createImageData(w, h), rand = mulberry(seed);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -39,7 +39,7 @@ function paint(w, h, seed, fn) {
 }
 
 // value noise on a lattice, tiling over (w, h)
-function noise2(seed, cell, w, h) {
+export function noise2(seed, cell, w, h) {
   const r = mulberry(seed), cw = Math.ceil(w / cell), ch = Math.ceil(h / cell), v = [];
   for (let i = 0; i < cw * ch; i++) v.push(r());
   const g = (x, y) => v[((y % ch) + ch) % ch * cw + (((x % cw) + cw) % cw)];

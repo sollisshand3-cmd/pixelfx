@@ -25,7 +25,7 @@ const bare = single
   .replace(/<!doctype html>\s*/i, "")
   .replace(/<\/?html[^>]*>\s*/gi, "")
   .replace(/<\/?head>\s*/gi, "")
-  .replace(/<\/?body>\s*/gi, "")
+  .replace(/<\/?body[^>]*>\s*/gi, "")
   .replace(/<meta (charset|name="viewport")[^>]*>\s*/gi, "");
 await writeFile(new URL("dist/senyap.embed.html", here), bare);
 console.log(`dist/senyap.html  ${(single.length / 1024).toFixed(0)} KB`);
