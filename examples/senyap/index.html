@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ms">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -125,6 +125,31 @@
   #pauseBtn { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); width: 48px; height: 48px; border-radius: 6px; }
   #cctvUI { position: fixed; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; gap: 12px; }
   #cctvUI button { background: rgba(0,20,6,0.7); border: 1px solid #3a8a4a; color: #a8ffb0; min-width: 64px; min-height: 48px; font-size: 21px; }
+
+  /* story cards: an advert, a quote, a text message */
+  .cardbox { text-align: left; display: flex; flex-direction: column; gap: 14px; min-height: 12em; justify-content: center; }
+  .cardbox.in { animation: cardIn 0.9s ease-out both; }
+  #cardHead { font-size: clamp(24px, 5.5vw, 34px); line-height: 1.15; white-space: pre-line; color: var(--ink); text-wrap: pretty; }
+  #cardSmall { color: var(--dim); font-size: 21px; white-space: pre-line; text-wrap: pretty; }
+  .cardbox.ad #cardHead { background: var(--paper); color: var(--paper-ink); padding: 14px 16px; box-shadow: 6px 6px 0 rgba(0,0,0,0.6); transform: rotate(-1deg); font-size: clamp(21px, 4.6vw, 27px); }
+  .cardbox.quote #cardHead { color: var(--brass); border-left: 3px solid var(--brass); padding-left: 14px; }
+  .cardbox.sms #cardHead { background: #0e1a14; border: 1px solid #2a5a42; border-radius: 10px 10px 10px 2px; padding: 12px 14px; color: #c8f0d8; font-size: clamp(21px, 4.6vw, 26px); }
+  .cardnav { align-items: center; }
+  .link { background: none; border: none; color: var(--dim); text-decoration: underline; cursor: pointer; font-size: 19px; min-height: 40px; }
+  .link:hover { color: var(--ink); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .cardbox.in { animation: none; } }
+  /* what you know: the day screen and the pause journal */
+  .know, .tonight { text-align: left; border: 1px solid var(--faint); padding: 10px 14px; background: rgba(14,12,10,0.8); }
+  .know h3, .tonight h3 { margin: 0 0 6px; font-weight: 400; color: var(--brass); letter-spacing: 0.12em; font-size: 20px; }
+  .know ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 19px; color: var(--ink); }
+  .know li.none, .know .none { color: var(--dim); list-style: none; margin-left: -18px; }
+  .tonight p { color: var(--teal); }
+  .journal { max-height: 34vh; overflow-y: auto; }
+  .journal h3 + ul { margin-bottom: 10px; }
+  #jNotes { justify-content: flex-start; }
+  .langs { align-items: center; }
+  #langRow button[aria-pressed="true"] { color: var(--brass); border-color: var(--brass); }
 </style>
 </head>
 <body data-donate="">
@@ -135,119 +160,146 @@
 <div id="popup" hidden><div id="popTitle"></div><div id="popSub"></div></div>
 <div id="hint" hidden><span id="hintText"></span></div>
 
+<div id="touch" hidden>
+  <div id="stick" hidden><div id="knob"></div></div>
+  <button class="tbtn" id="useBtn" data-i18n="btn.use">USE</button>
+  <button class="tbtn" id="lightBtn" data-i18n="btn.light">LIGHT</button>
+  <button class="tbtn" id="runBtn" data-i18n="btn.run">RUN</button>
+  <button class="tbtn" id="pauseBtn" aria-label="Pause">II</button>
+  <div id="cctvUI" hidden>
+    <button id="camPrev" aria-label="Previous camera">&lt;</button>
+    <button id="camExit" data-i18n="btn.exit">EXIT</button>
+    <button id="camNext" aria-label="Next camera">&gt;</button>
+  </div>
+</div>
+
 <div id="note" hidden>
   <div class="paper" role="dialog" aria-labelledby="noteTitle">
     <h3 id="noteTitle"></h3>
     <div id="noteText"></div>
-    <button class="ghost" id="noteClose">Tutup (E)</button>
+    <button class="ghost" id="noteClose" data-i18n="ui.close">Close (E)</button>
   </div>
 </div>
 
 <div id="chooser" hidden>
   <div class="panel" role="dialog" aria-labelledby="chooserTitle">
-    <h3 id="chooserTitle">Lif</h3>
+    <h3 id="chooserTitle"></h3>
     <div id="chooserBtns"></div>
     <span class="small" id="chooserHint"></span>
-    <button class="ghost" id="chooserCancel">Batal</button>
-  </div>
-</div>
-
-<div id="touch" hidden>
-  <div id="stick" hidden><div id="knob"></div></div>
-  <button class="tbtn" id="useBtn">GUNA</button>
-  <button class="tbtn" id="lightBtn">LAMPU</button>
-  <button class="tbtn" id="runBtn">LARI</button>
-  <button class="tbtn" id="pauseBtn" aria-label="Jeda">II</button>
-  <div id="cctvUI" hidden>
-    <button id="camPrev" aria-label="Kamera sebelum">&lt;</button>
-    <button id="camExit">KELUAR</button>
-    <button id="camNext" aria-label="Kamera seterusnya">&gt;</button>
+    <button class="ghost" id="chooserCancel" data-i18n="ui.cancel">Cancel</button>
   </div>
 </div>
 
 <section class="screen" id="title">
   <div class="card">
     <h1>SENYAP</h1>
-    <p class="sub1">HOTEL MALAM</p>
-    <p class="story">Nama kamu sudah ditanda keluar. Cari jalan keluar melalui laluan servis sebelum Bayang menemui kamu.</p>
-    <p class="story long small">Tujuh malam sebagai pengawal keselamatan Hotel Seri Malam. Tekan jam rondaan, jawab laporan dari bilik yang sepatutnya kosong, dan tulis laporan sebelum pukul enam pagi.</p>
+    <p class="sub1" data-i18n="ui.tagline">THE NIGHT HOTEL</p>
+    <p class="story" data-i18n="ui.lead"></p>
+    <p class="story long small" data-i18n="ui.lead2"></p>
     <div class="how desk">
-      <b>WASD</b><span>bergerak</span>
-      <b>Tetikus</b><span>lihat sekeliling</span>
-      <b>E / klik</b><span>guna, buka pintu, jawab telefon, bersembunyi</span>
-      <b>Shift</b><span>lari (bising!)</span>
-      <b>F</b><span>lampu suluh</span>
+      <b>WASD</b><span data-i18n="ui.k.move"></span>
+      <b data-i18n="ui.k.mouse"></b><span data-i18n="ui.k.look"></span>
+      <b data-i18n="ui.k.click"></b><span data-i18n="ui.k.use"></span>
+      <b>Shift</b><span data-i18n="ui.k.run"></span>
+      <b>F</b><span data-i18n="ui.k.light"></span>
     </div>
     <div class="how mob">
-      <b>Kiri</b><span>seret untuk bergerak</span>
-      <b>Kanan</b><span>seret untuk melihat</span>
-      <b>GUNA</b><span>buka, jawab, bersembunyi</span>
+      <b data-i18n="ui.m.left"></b><span data-i18n="ui.m.drag"></span>
+      <b data-i18n="ui.m.right"></b><span data-i18n="ui.m.look"></span>
+      <b data-i18n="btn.use"></b><span data-i18n="ui.k.use"></span>
     </div>
-    <div class="field"><label for="nameInput">Nama pada tag nama</label><input type="text" id="nameInput" maxlength="18" placeholder="Pengawal" autocomplete="off"></div>
-    <button class="go" id="startBtn">MASUK</button>
-    <div id="nightRow" class="row" hidden><span class="small">Pilih malam:</span><div id="nightPick"></div></div>
+    <div class="field"><label for="nameInput" data-i18n="ui.name"></label><input type="text" id="nameInput" maxlength="18" data-i18n-ph="ui.namePh" autocomplete="off"></div>
+    <button class="go" id="startBtn">ENTER</button>
+    <div id="nightRow" class="row" hidden><span class="small" data-i18n="ui.pick"></span><div id="nightPick"></div><button class="link" id="prologueBtn" data-i18n="ui.prologue"></button></div>
+    <div class="row langs"><span class="small" data-i18n="ui.lang"></span><div id="langRow" class="row"></div></div>
     <div id="donate" hidden>
-      <a id="donateLink" href="#" target="_blank" rel="noopener">Sokong pembangunan</a>
-      <p>Jika anda suka SENYAP, sumbangan anda membantu pembikinan bab dan audio baharu.</p>
+      <a id="donateLink" href="#" target="_blank" rel="noopener" data-i18n="ui.donate"></a>
+      <p data-i18n="ui.donateText"></p>
     </div>
-    <p class="small">Pakai fon kepala. Bunyi ialah separuh daripada ketakutan.</p>
+    <p class="small" data-i18n="ui.headphones"></p>
+  </div>
+</section>
+
+<section class="screen" id="cards" hidden>
+  <div class="card">
+    <div class="cardbox" id="cardBox">
+      <p id="cardHead"></p>
+      <p id="cardSmall"></p>
+    </div>
+    <div class="row cardnav">
+      <span class="small" id="cardStep"></span>
+      <button class="go" id="cardNext">NEXT</button>
+      <button class="link" id="cardSkip" data-i18n="ui.skip">Skip</button>
+    </div>
   </div>
 </section>
 
 <section class="screen" id="day" hidden>
   <div class="card">
-    <h2 id="dayTitle">HARI 1</h2>
+    <h2 id="dayTitle">DAY 1</h2>
     <p class="sub1" id="dayName"></p>
     <p class="from" id="dayFrom"></p>
     <p class="msg" id="dayText"></p>
+    <div class="know" id="dayKnow" hidden>
+      <h3 data-i18n="ui.know"></h3>
+      <ul id="dayKnowList"></ul>
+    </div>
+    <div class="tonight"><h3 data-i18n="ui.tonight"></h3><p id="dayTonightText"></p></div>
     <p class="hintbox" id="dayHint" hidden></p>
-    <button class="go" id="dayBtn">MULA SYIF</button>
+    <button class="go" id="dayBtn">START SHIFT</button>
   </div>
 </section>
 
 <section class="screen" id="report" hidden>
   <div class="card">
     <div class="report">
-      <h3 id="repTitle">LAPORAN SYIF</h3>
+      <h3 id="repTitle"></h3>
       <dl id="repMeta"></dl>
       <ol id="repLog"></ol>
       <p class="twist" id="repTwist" hidden></p>
     </div>
     <p id="repNote"></p>
-    <button class="go" id="repBtn">TERUSKAN</button>
+    <button class="go" id="repBtn" data-i18n="ui.continue">CONTINUE</button>
   </div>
 </section>
 
 <section class="screen" id="pause" hidden>
   <div class="card">
-    <h2>JEDA</h2>
-    <p class="story">Ia masih di sana. Menunggu.</p>
+    <h2 data-i18n="ui.pause">PAUSED</h2>
+    <p class="story" data-i18n="ui.pauseText"></p>
     <div class="settings">
-      <label for="volume">Volum</label><input type="range" id="volume" min="0" max="1" step="0.05">
-      <label for="sens">Kepekaan pandangan</label><input type="range" id="sens" min="0.4" max="2" step="0.1">
-      <label for="subsToggle">Sari kata bunyi</label><input type="checkbox" id="subsToggle">
+      <label for="volume" data-i18n="ui.volume"></label><input type="range" id="volume" min="0" max="1" step="0.05">
+      <label for="sens" data-i18n="ui.sens"></label><input type="range" id="sens" min="0.4" max="2" step="0.1">
+      <label for="subsToggle" data-i18n="ui.subs"></label><input type="checkbox" id="subsToggle">
     </div>
-    <button class="go" id="resumeBtn">SAMBUNG</button>
-    <div class="row"><button class="ghost" id="restartBtn">Mula semula malam ini</button><button class="ghost" id="menuBtn">Menu utama</button></div>
+    <button class="go" id="resumeBtn" data-i18n="ui.resume">RESUME</button>
+    <div class="know journal">
+      <h3 data-i18n="ui.know"></h3>
+      <ul id="jKnow"></ul>
+      <h3 data-i18n="ui.notes"></h3>
+      <div id="jNotes" class="row"></div>
+    </div>
+    <div class="row"><button class="ghost" id="restartBtn" data-i18n="ui.restart"></button><button class="ghost" id="menuBtn" data-i18n="ui.menu"></button></div>
   </div>
 </section>
 
 <section class="screen" id="dead" hidden>
   <div class="card">
-    <h2 id="deadTitle">KAMU DITANGKAP</h2>
+    <h2 id="deadTitle"></h2>
     <p class="story" id="deadText"></p>
     <p class="tag" id="deadTag"></p>
-    <button class="go" id="retryBtn">CUBA LAGI</button>
-    <button class="ghost" id="deadMenuBtn">Menu utama</button>
+    <button class="go" id="retryBtn"></button>
+    <button class="ghost" id="deadMenuBtn" data-i18n="ui.menu"></button>
   </div>
 </section>
 
 <section class="screen" id="ending" hidden>
   <div class="card">
-    <h2 id="endTitle" style="color:var(--teal)">KAMU TERLEPAS</h2>
+    <p class="sub1" data-i18n="ui.theEnd"></p>
+    <h2 id="endTitle" style="color:var(--teal)"></h2>
     <p class="msg" id="endText"></p>
     <p class="tag" id="endTeaser" style="white-space:pre-line"></p>
-    <button class="go" id="endBtn">MENU UTAMA</button>
+    <button class="go" id="endBtn" data-i18n="ui.menuBig"></button>
   </div>
 </section>
 

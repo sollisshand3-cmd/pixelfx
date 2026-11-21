@@ -1,7 +1,8 @@
 # SENYAP · Hotel Malam
 
-A first-person pixel horror game in seven night shifts, built from this repo's effects and three.js. The
-game's text is in Malay.
+A first-person pixel horror game in seven night shifts, built from this repo's effects and three.js. Play it in
+English (the default), Bahasa Malaysia or Bahasa Indonesia; the language picker is on the title screen and
+every word, from the HUD and door signs to the notes and subtitles, lives in `src/i18n.js`.
 
 You are the new night security guard at Hotel Seri Malam, an old hotel closed "for renovation". The manager
 says there are no guests. The phone in the security post keeps ringing anyway: reports from rooms that have
@@ -19,6 +20,12 @@ before you, Pak Din, lasted seven nights and left notes behind.
 | 5 | Lif | The CCTV shows something on floor 3 staring at the camera. The lift calls itself to the lobby and speaks, first through its speaker, then from inside the empty cabin. |
 | 6 | 317 | A call from room 317, which doesn't exist. Its door appears at the end of floor 3. The report you write finishes itself. |
 | 7 | Hotel Malam | You wake on the lobby sofa at 3.17 with your name checked out. Three keys (207, Maintenance, Exit) lead to the service door; the lift is faster, but its bell brings Bayang. |
+
+A prologue (the job advert, Mr Rahman at the service door) comes before night 1. Every day screen has the
+manager's message, **what you know so far** and **tonight's goal**, and the pause menu keeps the same journal
+plus every note you've found. Winning night 7 plays an epilogue with a twist: Mr Rahman was the guard on the
+night of the fire, the only one who ever got out, and getting out means taking his place and hiring the next
+guard. The final message on your phone is the welcome text you read on day 1, signed with your name.
 
 Each shift ends with a written report: the patrol clocks you punched and every report from a room, what was
 found and what you did. A day screen with a message from the manager comes before the next night.

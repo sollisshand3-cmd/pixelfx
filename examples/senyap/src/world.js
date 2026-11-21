@@ -6,6 +6,7 @@ import { FLOORS, FLOOR, T, WALL_H, LEVEL_GAP, LIGHTS, CAMERAS } from "./data/map
 import * as tex from "./hoteltex.js";
 import { glowTexture } from "./textures.js";
 import { FxSprite } from "./fxsprite.js";
+import { t as t_ } from "./i18n.js";
 import * as rain from "../../../src/fx/weather/rain.js";
 import * as candleFx from "../../../src/fx/fire/candle.js";
 import * as keyGlint from "../../../src/fx/pickups/key-glint.js";
@@ -182,7 +183,7 @@ export class Hotel {
               bar.position.copy(facePos(x, y, fc, 1.2, 0.04));
               bar.rotation.y = rot;
               F.group.add(bar);
-              this.addInteract({ id: "mainDoor", kind: "mainDoor", floor: f.id, pos: facePos(x, y, fc, 1.1), label: "Pintu utama", radius: 2 });
+              this.addInteract({ id: "mainDoor", kind: "mainDoor", floor: f.id, pos: facePos(x, y, fc, 1.1), label: "p.mainDoor", radius: 2 });
             }
           } else {
             const d = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.2), new THREE.MeshStandardMaterial({ map: tex.doorTex(c === "S" ? "" : "SERVIS", { metal: true }), roughness: 0.6, metalness: 0.3 }));
@@ -190,7 +191,7 @@ export class Hotel {
             d.rotation.y = rot;
             F.group.add(d);
             const kind = c === "S" ? "stairs" : "exitDoor";
-            this.addInteract({ id: kind === "stairs" ? `stairs_${f.id}` : "exitDoor", kind, floor: f.id, pos: facePos(x, y, fc, 1.1), label: c === "S" ? "Tangga" : "Pintu servis", radius: 1.9 });
+            this.addInteract({ id: kind === "stairs" ? `stairs_${f.id}` : "exitDoor", kind, floor: f.id, pos: facePos(x, y, fc, 1.1), label: c === "S" ? "ui.stairs" : "p.serviceDoor", radius: 1.9 });
             if (c === "S") F.stairs = { x, y, face: fc };
             this.props[kind === "stairs" ? `stairs_${f.id}` : "exitDoor"] = { floor: f.id, pos: facePos(x, y, fc, 1.4) };
           }
@@ -223,7 +224,8 @@ export class Hotel {
     const hinge = new THREE.Group();
     hinge.position.set(-open / 2, 0, 0);
     g.add(hinge);
-    const leafMat = new THREE.MeshStandardMaterial({ map: tex.doorTex(meta.label ?? "", { burnt: meta.label === "317" }), roughness: 0.8 });
+    const plate = /^\d+$/.test(meta.label ?? "") ? meta.label : "";
+    const leafMat = new THREE.MeshStandardMaterial({ map: tex.doorTex(plate, { burnt: meta.label === "317" }), roughness: 0.8 });
     const leaf = boxMesh(open, 2.3, 0.07, leafMat);
     leaf.position.set(open / 2, 1.15, 0);
     hinge.add(leaf);
@@ -312,7 +314,7 @@ export class Hotel {
     const lift = { floor: F.data.id, x, y, face: fc, panels, open: false, t: 0, group: g };
     this.lifts[F.data.id] = lift;
     this.props[`lift_${F.data.id}`] = { floor: F.data.id, pos: new THREE.Vector3(cx + fc.dx * T * 0.45, Y + 1.6, cz + fc.dy * T * 0.45) };
-    this.addInteract({ id: `lift_${F.data.id}`, kind: "lift", floor: F.data.id, pos: new THREE.Vector3(cx + fc.dx * T * 0.5, Y + 1.2, cz + fc.dy * T * 0.5), label: "Lif", radius: 1.9 });
+    this.addInteract({ id: `lift_${F.data.id}`, kind: "lift", floor: F.data.id, pos: new THREE.Vector3(cx + fc.dx * T * 0.5, Y + 1.2, cz + fc.dy * T * 0.5), label: "ui.lift", radius: 1.9 });
     F.colliders.push({ x0: x, x1: x + 1, y0: y, y1: y + 1, sight: true, h: WALL_H });
   }
 
@@ -365,7 +367,7 @@ export class Hotel {
       case "sink":
         add(boxMesh(w, 0.12, d, M.white), 0, p.h);
         add(boxMesh(w * 0.3, p.h, d * 0.3, M.white), 0, p.h / 2);
-        interact = { label: "Periksa sinki" };
+        interact = { label: "p.sink" };
         break;
       case "hook": {
         rotFace();
@@ -373,8 +375,8 @@ export class Hotel {
         if (p.id === "uniform207") {
           add(boxMesh(0.5, 0.75, 0.12, tex.mat(0x1c2438)), 0, p.h - 0.42, 0.1);
           add(boxMesh(0.12, 0.05, 0.02, M.brass), 0.12, p.h - 0.22, 0.17);
-          interact = { label: "Periksa uniform" };
-        } else interact = { label: "Periksa penyangkut" };
+          interact = { label: "p.uniform" };
+        } else interact = { label: "p.hook" };
         break;
       }
       case "wardrobe": {
@@ -383,7 +385,7 @@ export class Hotel {
         const fv = FACE_VEC[p.face ?? "e"];
         const line = boxMesh(fv[0] ? 0.02 : w * 0.02, p.h * 0.9, fv[1] ? 0.02 : d * 0.02, M.black);
         add(line, (fv[0] * w) / 2, p.h / 2, (fv[1] * d) / 2);
-        if (p.hide) interact = { label: "Bersembunyi", kind: "hide", face: p.face };
+        if (p.hide) interact = { label: "p.hide", kind: "hide", face: p.face };
         break;
       }
       case "desk":
@@ -406,13 +408,13 @@ export class Hotel {
         const art = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.45), tex.mat(0x4a5a2a));
         add(art, 0, p.h, 0.022);
         art.rotation.z = 0.03;
-        interact = { label: "Lihat lukisan" };
+        interact = { label: "p.painting" };
         break;
       }
       case "phone":
         add(boxMesh(0.22, 0.08, 0.16, p.id === "phone_317" ? M.burnt : M.cream), 0, p.h + 0.04);
         add(boxMesh(0.24, 0.05, 0.06, M.black), 0, p.h + 0.1, -0.04);
-        interact = { label: p.label ?? "Telefon", kind: "phone" };
+        interact = { label: p.label ?? "p.phone", kind: "phone" };
         break;
       case "monitor": {
         rotFace();
@@ -502,7 +504,7 @@ export class Hotel {
       }
       case "sign": {
         rotFace();
-        const t = tex.signTex(p.text, { exit: p.exit }), sw = p.w ?? 0.8, sh = sw / t.userData.aspect;
+        const t = tex.signTex(t_(p.text), { exit: p.exit }), sw = p.w ?? 0.8, sh = sw / t.userData.aspect;
         const m = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), p.exit ? new THREE.MeshBasicMaterial({ map: t }) : new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 }));
         add(m, 0, p.h, 0.01);
         break;
@@ -512,7 +514,7 @@ export class Hotel {
         add(boxMesh(0.25, 0.32, 0.12, M.metal), 0, p.h, 0.06);
         add(new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), M.led), 0.06, p.h + 0.1, 0.125);
         add(new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.06), M.screen), -0.02, p.h + 0.02, 0.125);
-        interact = { label: "Tekan jam rondaan", kind: "punch" };
+        interact = { label: "p.punch", kind: "punch" };
         break;
       }
       case "shelf":

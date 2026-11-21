@@ -10,7 +10,8 @@ import * as crtOff from "../../../src/fx/transitions/crt-off.js";
 import * as glitchWipe from "../../../src/fx/transitions/glitch-wipe.js";
 import * as questComplete from "../../../src/fx/ui/quest-complete.js";
 import { T, LEVEL_GAP, FLOOR, FLOOR_ORDER, FLOOR_NAME, ARRIVE, START } from "./data/maps.js";
-import { NIGHTS, NOTES } from "./data/story.js";
+import { NIGHTS, NOTES, KNOWN, PROLOGUE, EPILOGUE } from "./data/story.js";
+import { t, lang, setLang, LANGS } from "./i18n.js";
 import { Hotel } from "./world.js";
 import { Bayang, BLOOD } from "./bayang.js";
 import { Sound } from "./audio.js";
@@ -234,12 +235,12 @@ function muffleTo(w) {
 }
 function dirWord(w) {
   if (!w) return "";
-  if (w.floor !== P.floor) return FLOOR[w.floor].level > FLOOR[P.floor].level ? "dari atas" : "dari bawah";
+  if (w.floor !== P.floor) return t(FLOOR[w.floor].level > FLOOR[P.floor].level ? "dir.above" : "dir.below");
   const dx = w.pos.x - P.x, dz = w.pos.z - P.z, d = Math.hypot(dx, dz);
-  if (d < 1.5) return "dekat kamu";
+  if (d < 1.5) return t("dir.near");
   const a = Math.atan2(-dx, -dz) - P.yaw, c = Math.cos(a), s = Math.sin(a);
-  const side = Math.abs(c) > Math.abs(s) ? (c > 0 ? "di depan" : "di belakang") : s > 0 ? "di kiri" : "di kanan";
-  return d > 14 ? side + ", jauh" : side;
+  const side = t(Math.abs(c) > Math.abs(s) ? (c > 0 ? "dir.front" : "dir.back") : s > 0 ? "dir.left" : "dir.right");
+  return d > 14 ? side + t("dir.far") : side;
 }
 const CAPTIONS = {
   bell: "loceng kaunter", knock: "ketukan", step: "langkah kaki", slam: "pintu terhempas", thump: "dentuman dari dobi", water: "air mengalir",
@@ -248,7 +249,7 @@ const CAPTIONS = {
 function sfx(name, w, o) {
   const at = where(w);
   sound.play(name, at ? sound.at(at.pos, muffleTo(at)) : null, o);
-  if (CAPTIONS[name] && at) sub(`[${CAPTIONS[name]} ${dirWord(at)}]`, 2.6, "caption");
+  if (CAPTIONS[name] && at) sub(`[${t("cap." + name)} ${dirWord(at)}]`, 2.6, "caption");
   return at;
 }
 function noiseAt(at, radius) {
@@ -264,7 +265,10 @@ function emit(evt, ...a) {
 function makeCtx(n, flags, resume) {
   const c = {
     night: n,
-    name: playerName || "Pengawal",
+    get name() {
+      return playerName || t("ui.namePh");
+    },
+    t: (k, v) => t(k, v),
     flags,
     resume,
     get time() {
@@ -292,19 +296,19 @@ function makeCtx(n, flags, resume) {
       c.on(evt, w);
     },
     task(id, text) {
-      if (!tasks.find((t) => t.id === id)) tasks.push({ id, text, done: false, at: time });
+      if (!tasks.find((q) => q.id === id)) tasks.push({ id, text, done: false, at: time });
     },
     done(id) {
-      const t = tasks.find((t) => t.id === id);
-      if (!t || t.done) return;
-      t.done = true;
-      t.at = time;
+      const q = tasks.find((q) => q.id === id);
+      if (!q || q.done) return;
+      q.done = true;
+      q.at = time;
       sound.play("chime");
       emit("done:" + id);
       checkReady();
     },
-    isDone: (id) => !!tasks.find((t) => t.id === id && t.done),
-    has: (id) => !!tasks.find((t) => t.id === id),
+    isDone: (id) => !!tasks.find((q) => q.id === id && q.done),
+    has: (id) => !!tasks.find((q) => q.id === id),
     after(sec, fn, tag) {
       timers.push({ t: time + sec, fn, tag });
     },
@@ -316,14 +320,13 @@ function makeCtx(n, flags, resume) {
       pending = Math.max(0, pending - 1);
       checkReady();
     },
-    say: (text, dur = 3) => sub(text, dur, "say"),
-    caption: (text, w) => sub(w ? text.replace("]", " " + dirWord(where(w)) + "]") : text, 2.6, "caption"),
-    hint,
+    say: (text, dur = 3) => sub(t(text), dur, "say"),
+    caption: (text, w) => sub(`[${t(text)}${w ? " " + dirWord(where(w)) : ""}]`, 2.6, "caption"),
+    hint: (k) => hint(t(k)),
     popup,
-    read: (title, text) => openNote(title, text),
+    read: (title, text) => openNote(t(title), t(text, { name: c.name.toUpperCase() })),
     note(id) {
-      const nt = NOTES[id];
-      openNote(nt.title, nt.text);
+      openNote(t(`note.${id}.t`), t(`note.${id}`));
       const seen = new Set(store.get("notes", []));
       seen.add(id);
       store.set("notes", [...seen]);
@@ -350,7 +353,7 @@ function makeCtx(n, flags, resume) {
         handle: sound.ring(
           () => sound.at(at.pos, muffleTo(at)),
           () => {
-            sub(`[telefon berdering ${dirWord(at)}]`, 2.4, "caption");
+            sub(`[${t("cap.ring")} ${dirWord(at)}]`, 2.4, "caption");
             if (o.attract !== false) noiseAt(at, 9);
           },
         ),
@@ -360,10 +363,10 @@ function makeCtx(n, flags, resume) {
       speak(lines, w ? where(w) : null);
     },
     item: (spec) => spawnItem(spec),
-    key(id, name, place) {
-      P.keys.set(id, name ?? id);
-      if (name) {
-        popup(name, place);
+    key(id, silent) {
+      P.keys.set(id, "key." + id);
+      if (!silent) {
+        popup(t("key." + id), t("where." + id));
         sound.play("keys");
       }
     },
@@ -422,16 +425,17 @@ function makeCtx(n, flags, resume) {
 
 // the lines of a call or a voice, one after another, with subtitles
 function speak(lines, at) {
-  let t = 0;
-  for (const [who, text, style] of lines) {
-    ctx.after(t, () => {
-      if (style === "caption") return sub(text, 2.4, "caption");
+  let t_ = 0;
+  for (const [who, key, style] of lines) {
+    ctx.after(t_, () => {
+      if (style === "caption") return sub(`[${t(key)}]`, 2.4, "caption");
+      const text = t(key);
       const dest = style === "phone" || style === "self" || !at ? null : sound.at(at.pos, muffleTo(at), 0.4);
       const dur = sound.voice(text, style, dest) || 1;
-      const name = who === "Kamu" ? "" : who === "?" ? "SUARA: " : `${who.toUpperCase()}${style === "phone" ? " (telefon)" : style === "speaker" ? " (pembesar suara lif)" : ""}: `;
-      sub(name + text, Math.max(2.4, dur + 1.4), who === "Kamu" ? "self" : "line");
+      const name = who === "you" ? "" : `${t("who." + who)}${style === "phone" ? t("who.phone") : style === "speaker" ? t("who.speaker") : ""}: `;
+      sub(name + text, Math.max(2.4, dur + 1.4), who === "you" ? "self" : "line");
     });
-    t += Math.max(2.2, text.length * 0.055 + 1.2);
+    t_ += Math.max(2.2, t(key).length * 0.055 + 1.2);
   }
 }
 
@@ -443,8 +447,8 @@ function checkReady() {
     return;
   }
   if (tasks.length && tasks.every((t) => t.done)) {
-    tasks.push({ id: "write", text: "Kembali ke pos dan tulis laporan", done: false, at: time });
-    sub("Semua tugas selesai. Kembali ke pos.", 3, "say");
+    tasks.push({ id: "write", text: "task.write", done: false, at: time });
+    sub(t("s.allDone"), 3, "say");
   }
 }
 
@@ -475,7 +479,7 @@ function spawnItem(s) {
   }
   hotel.root.add(g);
   mesh = g;
-  const label = s.label ?? (s.kind === "battery" ? "Ambil bateri" : s.kind === "key" ? `Ambil ${s.key?.[1] ?? "kunci"}` : "Baca nota");
+  const label = s.label ?? (s.kind === "battery" ? "pr.battery" : s.kind === "key" ? `pr.take|${t("key." + s.key)}` : "pr.read");
   hotel.addInteract({ id: s.id, kind: "item", floor: s.floor, pos: pos.clone().add(new THREE.Vector3(0, 0.2, 0)), label, radius: 1.7, item: { ...s, mesh, sprite } });
 }
 
@@ -487,10 +491,10 @@ function takeItem(it) {
   else if (s.sprite) hotel.removeSprite(s.sprite);
   if (s.kind === "battery") {
     P.battery = Math.min(100, P.battery + 45);
-    popup("Bateri", "+45% lampu suluh");
+    popup(t("s.battery"), t("s.batterySub"));
     sound.play("chime", null, { pitch: 1.5 });
   } else if (s.kind === "key") {
-    ctx.key(...s.key);
+    ctx.key(s.key);
     hotel.burst(s.mesh.position.clone().add(new THREE.Vector3(0, 0.2, 0)), ["#140c04", "#3a2408", "#6a4614", "#a87a2a", "#e0b450", "#fff4c8", "#ffffff"]);
   } else if (s.note) ctx.note(s.note);
   emit("pickup:" + s.id);
@@ -522,20 +526,20 @@ function startNight(n, { fromCheckpoint = false } = {}) {
   humOn = true;
   nearLift = {};
   P.keys = new Map();
-  for (const k of night.keys ?? []) P.keys.set(k, k === "maint" ? "Kunci Penyelenggaraan" : k);
+  for (const k of night.keys ?? []) P.keys.set(k, "key." + k);
   clockStopped = night.stopClock ?? null;
   clockMin = SHIFT_START;
   const cp = fromCheckpoint && checkpointData?.night === n ? checkpointData : null;
   bayang = new Bayang(hotel, {
     onSee() {
       sound.play("stinger");
-      sub("Ia nampak kamu. LARI!", 2.2, "say");
+      sub(t("s.seen"), 2.2, "say");
     },
     onCatch: () => caught(),
     onBanish() {
       hotel.sprite(darkExplosion, { palette: BLOOD, seed: 5 }, 1 / 75, new THREE.Vector3(bayang.x, hotel.levelY(bayang.floor), bayang.z), hotel.oneShots);
       sound.play("screech", sound.at(new THREE.Vector3(bayang.x, hotel.levelY(bayang.floor) + 1.8, bayang.z)), { vol: 0.4 });
-      sub("Ia hilang ke dalam gelap... buat sementara.", 3, "say");
+      sub(t("s.banish"), 3, "say");
     },
     onScreech: () => sound.play("screech", sound.at(new THREE.Vector3(bayang.x, hotel.levelY(bayang.floor) + 1.8, bayang.z)), { vol: 0.2 }),
     onDoor: (d) => sfx("door", { floor: d.floor, x: d.x + 0.5, y: d.y + 0.5, h: 1.2 }),
@@ -549,14 +553,14 @@ function startNight(n, { fromCheckpoint = false } = {}) {
   Object.assign(P, { floor: f, x: x * T, z: y * T, yaw, pitch: 0, stamina: 100, battery: cp ? Math.max(cp.battery, 40) : 100, light: true, mode: "walk", hidden: null, zone: null, still: 0 });
   night.setup(ctx);
   // every door's default lock text; guest rooms are locked unless a report opens them
-  for (const d of hotel.doors) if (d.locked && !d.lockMsg) d.lockMsg = d.key ? `Berkunci. Perlu ${d.key === "maint" ? "Kunci Penyelenggaraan" : "kunci"}.` : /^\d+$/.test(d.label ?? "") ? "Bilik tetamu berkunci. Tiada laporan dari bilik ini." : "Berkunci.";
+  for (const d of hotel.doors) if (d.locked && !d.lockMsg) d.lockMsg = d.key ? `s.lockedKey` : /^\d+$/.test(d.label ?? "") ? "s.lockedRoom" : "s.locked";
   state = "play";
   showScreen(null);
   post.uniforms.dark.value = 0;
   screenFx = null;
   emit("start");
-  if (cp) sub("Disambung dari titik sambung.", 2.5, "say");
-  sub(`MALAM ${n} · ${night.title.toUpperCase()}`, 3, "say");
+  if (cp) sub(t("s.resumed"), 2.5, "say");
+  sub(t("s.nightTitle", { n, title: t(night.title).toUpperCase() }), 3, "say");
   relock();
 }
 
@@ -587,12 +591,13 @@ function promptFor(it) {
   if (!it) return null;
   if (it.kind === "door") {
     const d = it.door;
-    return d.open ? `Tutup pintu${d.label ? " " + d.label : ""}` : `Buka pintu${d.label ? " " + d.label : ""}`;
+    const dn = /^\d+$/.test(d.label ?? "") ? t("dl.num", { n: d.label }) : t(d.label ? "dl." + d.label : "dl.door");
+    return t(d.open ? "pr.close" : "pr.open", { d: dn.startsWith("dl.") ? t("dl.door") : dn });
   }
-  if (it.kind === "phone") return ringing[it.id] ? "Jawab telefon" : it.label;
-  if (it.kind === "lift") return "Panggil lif";
-  if (it.kind === "stairs") return "Guna tangga";
-  return it.label ?? "Periksa";
+  if (it.kind === "phone") return ringing[it.id] ? t("pr.answer") : t(it.label);
+  if (it.kind === "lift") return t("pr.lift");
+  if (it.kind === "stairs") return t("pr.stairs");
+  return t(it.label ?? "pr.look");
 }
 
 function interact() {
@@ -614,7 +619,7 @@ function interact() {
       sfx("beep", it.id);
       noiseAt(where(it.id), 6);
       if (emit("punch:" + it.id)) return;
-      return sub("Jam rondaan ditekan.", 2, "say");
+      return sub(t("s.punched"), 2, "say");
     case "cctv":
       return enterCctv();
     case "hide":
@@ -624,16 +629,16 @@ function interact() {
       return writeReport();
     case "phone":
       sound.play("click");
-      return sub("Gagang diangkat. Hanya bunyi desis.", 2.5, "say");
+      return sub(t("s.hiss"), 2.5, "say");
     case "exitDoor":
       sound.play("locked");
-      return sub("Pintu servis berkunci.", 2.5, "say");
+      return sub(t("s.serviceLocked"), 2.5, "say");
     case "mainDoor":
       sound.play("locked");
-      return sub("Pintu utama berkunci dari luar.", 2.5, "say");
+      return sub(t("s.mainLocked"), 2.5, "say");
     default:
-      if (it.examine) sub(it.examine, 3, "say");
-      else sub("Tiada apa-apa yang luar biasa.", 2, "say");
+      if (it.examine) sub(t(it.examine), 3, "say");
+      else sub(t("s.nothing"), 2, "say");
   }
 }
 
@@ -646,7 +651,7 @@ function useDoor(d) {
       sub(`Dibuka dengan ${P.keys.get(d.key)}.`, 2, "say");
     } else {
       sfx("locked", at);
-      return sub(d.lockMsg ?? "Berkunci.", 2.5, "say");
+      return sub(t(d.lockMsg ?? "s.locked", { key: t("key." + d.key) }), 2.5, "say");
     }
   }
   if (d.open) {
@@ -691,7 +696,7 @@ function leaveHide() {
 
 // ---------------------------------------------------------------- CCTV
 function enterCctv() {
-  if (!hotel.powered) return sub("Monitor gelap. Tiada kuasa.", 2.5, "say");
+  if (!hotel.powered) return sub(t("s.noPowerCctv"), 2.5, "say");
   P.mode = "cctv";
   cctvIdx = 0;
   $("cctvUI").hidden = !touch;
@@ -721,16 +726,16 @@ function openChooser(via) {
   for (const f of options.slice().reverse()) {
     const b = document.createElement("button");
     const open = night.floors.includes(f);
-    const label = `${k} · ${FLOOR_NAME[f]}${open ? "" : " (ditutup)"}`;
-    b.textContent = via === "stairs" ? `${FLOOR_ORDER.indexOf(f) > here ? "Naik" : "Turun"} ke ${label.slice(4)}` : label;
+    const fname = t(FLOOR_NAME[f]) + (open ? "" : t("ui.closed"));
+    b.textContent = `${k} · ` + (via === "stairs" ? t(FLOOR_ORDER.indexOf(f) > here ? "ui.up" : "ui.down", { f: fname }) : fname);
     b.disabled = !open;
     b.dataset.key = String(k);
     b.addEventListener("click", () => travel(f, via));
     box.appendChild(b);
     k++;
   }
-  $("chooserTitle").textContent = via === "stairs" ? "Tangga" : "Lif";
-  $("chooserHint").textContent = touch ? "" : "Tekan nombor, atau E untuk batal";
+  $("chooserTitle").textContent = t(via === "stairs" ? "ui.stairs" : "ui.lift");
+  $("chooserHint").textContent = touch ? "" : t("ui.chooserHint");
   $("chooser").hidden = false;
   P.mode = "choose";
 }
@@ -743,12 +748,12 @@ function closeChooser() {
 function callLift(f) {
   if (!hotel.powered) {
     sound.play("click");
-    return sub("Butang lif tidak menyala. Tiada kuasa.", 2.5, "say");
+    return sub(t("s.noPowerLift"), 2.5, "say");
   }
   hotel.liftDoors(f, true);
   const at = where(`lift_${f}`) ?? { floor: f, pos: hotel.pos(f, hotel.lifts[f].x + 0.5, hotel.lifts[f].y + 0.5, 1.5) };
   sound.play("liftding", sound.at(at.pos));
-  sub("[loceng lif]", 2, "caption");
+  sub(`[${t("cap.lift")}]`, 2, "caption");
   noiseAt(at, 30);
   ctx.after(0.8, () => openChooser("lift"));
 }
@@ -780,7 +785,7 @@ function arrive() {
     noiseAt(at, 30);
     ctx.after(4, () => hotel.liftDoors(to, false));
   }
-  sub(FLOOR_NAME[to], 1.8, "say");
+  sub(t(FLOOR_NAME[to]), 1.8, "say");
   emit("floor:" + to);
   emit(`${via}:${to}`);
 }
@@ -789,7 +794,7 @@ function arrive() {
 function writeReport() {
   if (!tasks.find((t) => t.id === "write")) {
     const left = tasks.find((t) => !t.done);
-    return sub(left ? `Belum boleh tulis laporan: ${left.text.toLowerCase()}.` : "Tiada apa untuk dilaporkan.", 3, "say");
+    return sub(left ? t("s.notYet", { task: t(left.text).toLowerCase() }) : t("s.nothingReport"), 3, "say");
   }
   tasks.find((t) => t.id === "write").done = true;
   sound.play("chime");
@@ -801,24 +806,24 @@ function endNight() {
   document.exitPointerLock?.();
   for (const r of Object.values(ringing)) r.handle.stop();
   for (const l of Object.values(loops)) l.stop();
-  bannerFx = createFx(questComplete, { text: "SYIF SELESAI", seed: 8, x: hudFrame.w / 2, y: hudFrame.h / 2 - 20, palette: ["#140a04", "#3a1e08", "#6a3a0e", "#9a5a14", "#c88a2a", "#e8b860", "#f8e8c0", "#ffffff"], ribbon: ["#080406", "#1a0a0c", "#3a1218", "#5a1a22", "#7a2430", "#9a3a3a", "#c06a5a"] });
-  const name = (playerName || "Pengawal").toUpperCase();
+  bannerFx = createFx(questComplete, { text: t("hud.shiftDone"), seed: 8, x: hudFrame.w / 2, y: hudFrame.h / 2 - 20, palette: ["#140a04", "#3a1e08", "#6a3a0e", "#9a5a14", "#c88a2a", "#e8b860", "#f8e8c0", "#ffffff"], ribbon: ["#080406", "#1a0a0c", "#3a1218", "#5a1a22", "#7a2430", "#9a3a3a", "#c06a5a"] });
+  const name = (playerName || t("ui.namePh")).toUpperCase();
   const punches = tasks.filter((t) => t.id.startsWith("punch_"));
   const rows = [
-    ["Malam", `${night.n} · ${night.title}`],
-    ["Pengawal", name],
-    ["Masa laporan", clockText()],
-    ["Jam rondaan", punches.length ? `${punches.filter((t) => t.done).length}/${punches.length}` : "-"],
+    [t("rep.night"), `${night.n} · ${t(night.title)}`],
+    [t("rep.guard"), name],
+    [t("rep.time"), clockText()],
+    [t("rep.clocks"), punches.length ? `${punches.filter((q) => q.done).length}/${punches.length}` : "-"],
   ];
-  $("repTitle").textContent = `LAPORAN SYIF · MALAM ${night.n}`;
+  $("repTitle").textContent = t("rep.title", { n: night.n });
   $("repMeta").innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
   $("repLog").innerHTML =
-    (log.length ? log : [{ room: "-", issue: "Tiada laporan dari bilik.", action: "" }])
-      .map((e) => `<li><b>${e.room}</b><span>${e.issue}</span>${e.action ? `<em>Tindakan: ${e.action}</em>` : ""}</li>`)
-      .join("") + night.report.map((r) => `<li class="obs"><span>${r}</span></li>`).join("");
+    (log.length ? log : [{ room: "-", issue: "rep.none", action: "" }])
+      .map((e) => `<li><b>${t(e.room)}</b><span>${t(e.issue)}</span>${e.action ? `<em>${t("rep.action")}${t(e.action)}</em>` : ""}</li>`)
+      .join("") + night.report.map((r) => `<li class="obs"><span>${t(r)}</span></li>`).join("");
   $("repTwist").hidden = !night.finale;
-  if (night.finale) $("repTwist").textContent = `Malam 7: ${name} · DITANDA KELUAR · 03:17`;
-  $("repNote").textContent = night.finale ? "Kamu tidak menulis baris terakhir itu. Pen masih bergerak apabila kamu melepaskannya." : "";
+  if (night.finale) $("repTwist").textContent = t("rep.twist", { name });
+  $("repNote").textContent = night.finale ? t("rep.twistNote") : "";
   progress.night = Math.max(progress.night, night.n + 1);
   store.set("progress", progress);
   checkpointData = null;
@@ -829,14 +834,18 @@ function showDay(n) {
   const nt = night_(n);
   state = "day";
   document.exitPointerLock?.();
-  $("dayTitle").textContent = n === 7 ? "MALAM 7" : `HARI ${n}`;
-  $("dayName").textContent = nt.title;
-  $("dayFrom").textContent = nt.day.from ? `Mesej daripada ${nt.day.from}` : "";
+  $("dayTitle").textContent = n === 7 ? t("ui.night", { n: 7 }) : t("ui.day", { n });
+  $("dayName").textContent = t(nt.title);
+  $("dayFrom").textContent = nt.day.from ? t("ui.msgFrom", { from: t(nt.day.from) }) : "";
   $("dayFrom").hidden = !nt.day.from;
-  $("dayText").textContent = nt.day.text;
-  $("dayHint").textContent = nt.day.hint ?? "";
+  $("dayText").textContent = t(nt.day.text);
+  $("dayHint").textContent = nt.day.hint ? t(nt.day.hint) : "";
   $("dayHint").hidden = !nt.day.hint;
-  $("dayBtn").textContent = n === 7 ? "BANGUN" : "MULA SYIF";
+  $("dayTonightText").textContent = t(nt.tonight);
+  const known = KNOWN[n] ?? [];
+  $("dayKnow").hidden = !known.length;
+  $("dayKnowList").innerHTML = known.map((k) => `<li>${t(k)}</li>`).join("");
+  $("dayBtn").textContent = t(n === 7 ? "ui.wake" : "ui.startShift");
   $("dayBtn").onclick = () => begin(n);
   showScreen("day");
 }
@@ -863,9 +872,10 @@ function caught() {
 function failShift(text) {
   state = "dead";
   document.exitPointerLock?.();
-  $("deadTitle").textContent = "SYIF GAGAL";
+  $("deadTitle").textContent = t("ui.fail");
   $("deadText").textContent = text;
-  $("deadTag").textContent = "Encik Rahman tidak akan berpuas hati.";
+  $("deadTag").textContent = t("ui.failTag");
+  $("retryBtn").textContent = t("ui.retry");
   showScreen("dead");
 }
 function win() {
@@ -941,7 +951,7 @@ function updatePlayer(dt) {
   if (on) P.battery = Math.max(0, P.battery - dt * (0.55 + (bayang.lit > 0 ? 2.6 : 0)));
   if (P.light && P.battery <= 0 && !P.flat) {
     P.flat = true;
-    sub("Lampu suluh kehabisan bateri.", 3, "say");
+    sub(t("s.flat"), 3, "say");
   }
   if (P.battery > 0) P.flat = false;
 
@@ -1009,7 +1019,7 @@ renderer.setAnimationLoop(() => {
     if (!clockStopped) clockMin += dt * MIN_PER_SEC;
     const cm = clockStopped ? 3 * 60 + 17 : Math.floor(clockMin);
     hotel.setClock(Math.floor(cm / 60) % 24, cm % 60);
-    if (!clockStopped && clockMin >= SHIFT_END && night.n < 7) return failShift("Pukul 6.00 pagi. Laporan syif tidak lengkap.");
+    if (!clockStopped && clockMin >= SHIFT_END && night.n < 7) return failShift(t("ui.failText"));
     if (post.uniforms.dark.value < 1 && P.mode !== "travel") post.uniforms.dark.value = Math.min(1, post.uniforms.dark.value + dt * 1.5);
     for (const t of timers.filter((t) => t.t <= time)) {
       timers.splice(timers.indexOf(t), 1);
@@ -1072,7 +1082,7 @@ renderer.setAnimationLoop(() => {
     dragCapT -= dt;
     if (bayang.active && bayang.moving > 0 && bayang.floor === P.floor && b.dist < 13 && dragCapT <= 0 && !bayang.onScreen(pinfo)) {
       dragCapT = 7;
-      sub(`[seretan kain ${dirWord({ floor: bayang.floor, pos: bpos })}]`, 2.5, "caption");
+      sub(`[${t("cap.drag")} ${dirWord({ floor: bayang.floor, pos: bpos })}]`, 2.5, "caption");
     }
     sound.listen(camera);
   } else if (state === "caught") {
@@ -1097,10 +1107,10 @@ renderer.setAnimationLoop(() => {
     if (caughtT > 1.5) post.uniforms.dark.value = Math.max(0, post.uniforms.dark.value - dt * 2);
     if (caughtT > 3.2) {
       state = "dead";
-      $("deadTitle").textContent = "KAMU DITANGKAP";
-      $("deadText").textContent = `Malam ${night.n}, ${clockText()}. ${tasks.filter((t) => t.done).length} daripada ${tasks.length} tugas selesai.`;
-      $("deadTag").textContent = "Bayang tidak pernah lapar lama.";
-      $("retryBtn").textContent = checkpointData?.night === night.n ? "SAMBUNG DARI TITIK SAMBUNG" : "CUBA LAGI MALAM INI";
+      $("deadTitle").textContent = t("ui.caught");
+      $("deadText").textContent = t("ui.caughtText", { n: night.n, time: clockText(), done: tasks.filter((q) => q.done).length, all: tasks.length });
+      $("deadTag").textContent = t(night.n === 7 ? "ui.caughtTag7" : "ui.caughtTag");
+      $("retryBtn").textContent = t(checkpointData?.night === night.n ? "ui.retryCp" : "ui.retry");
       showScreen("dead");
     }
   } else if (state === "ending") {
@@ -1108,11 +1118,12 @@ renderer.setAnimationLoop(() => {
     post.uniforms.dark.value = Math.max(0, 1 - caughtT * 0.6);
     if (caughtT > 2.2) {
       state = "done";
-      const e = night.ending;
-      $("endTitle").textContent = e.title;
-      $("endText").textContent = e.text;
-      $("endTeaser").textContent = e.teaser;
-      showScreen("ending");
+      playCards(EPILOGUE, () => {
+        $("endTitle").textContent = t("end.title");
+        $("endText").textContent = t("end.text");
+        $("endTeaser").textContent = t("end.teaser");
+        showScreen("ending");
+      });
     }
   }
 
@@ -1187,37 +1198,38 @@ function updateHud(dt) {
   if (hotel && (state === "play" || state === "paused")) {
     if (P.mode === "cctv") {
       const cam = hotel.cameras[cctvIdx];
-      p.text(cam.label, 8, 8, C.cam, { shadow: C.shadow });
-      p.text(`${clockText()}  ${FLOOR_NAME[cam.floor].toUpperCase()}`, 8, 16, C.cam, { shadow: C.shadow });
+      p.text(t(cam.label), 8, 8, C.cam, { shadow: C.shadow });
+      p.text(`${clockText()}  ${t(FLOOR_NAME[cam.floor]).toUpperCase()}`, 8, 16, C.cam, { shadow: C.shadow });
       if (Math.floor(performance.now() / 600) % 2) {
         p.rect(W - 30, 9, 4, 4, C.red);
         p.text("REC", W - 24, 8, C.cam);
       }
-      p.text(touch ? "TUKAR KAMERA DI BAWAH" : "A / D TUKAR KAMERA - E KELUAR", W / 2, H - 14, C.cam, { align: "center", shadow: C.shadow });
+      p.text(t(touch ? "hud.camTouch" : "hud.cam"), W / 2, H - 14, C.cam, { align: "center", shadow: C.shadow });
     } else {
       // looking out through the slats of a wardrobe
       if (P.mode === "hide") for (let yy = 0; yy < H; yy += 9) p.rect(0, yy, W, 5, C.shadow, 0.92);
-      p.text(`MALAM ${night.n}`, 8, 7, C.ink, { shadow: C.shadow });
-      p.text(clockText(), 8 + p.measure(`MALAM ${night.n}`)[0] + 6, 7, clockStopped ? C.red : C.dim, { shadow: C.shadow });
+      const nl = t("hud.night", { n: night.n });
+      p.text(nl, 8, 7, C.ink, { shadow: C.shadow });
+      p.text(clockText(), 8 + p.measure(nl)[0] + 6, 7, clockStopped ? C.red : C.dim, { shadow: C.shadow });
       // objectives: what's left, and what just got done
       let y = 18;
       const width = Math.min(150, W * 0.55);
-      for (const t of tasks) {
-        if (t.done && time - t.at > 4) continue;
-        const lines = wrap(p, t.text, width - 8);
-        p.rect(8, y + 1, 3, 3, t.done ? C.green : t.id === "write" ? C.amber : C.ink, t.done ? 1 : 0.9);
-        lines.forEach((l, i) => p.text(l, 14, y + i * 7, t.done ? C.dim : t.id === "write" ? C.amber : C.ink, { shadow: C.shadow }));
+      for (const q of tasks) {
+        if (q.done && time - q.at > 4) continue;
+        const lines = wrap(p, t(q.text), width - 8);
+        p.rect(8, y + 1, 3, 3, q.done ? C.green : q.id === "write" ? C.amber : C.ink, q.done ? 1 : 0.9);
+        lines.forEach((l, i) => p.text(l, 14, y + i * 7, q.done ? C.dim : q.id === "write" ? C.amber : C.ink, { shadow: C.shadow }));
         y += lines.length * 7 + 3;
         if (y > H * 0.5) break;
       }
       // keys held
       if (P.keys.size) {
-        const k = [...P.keys.values()].map((v) => v.replace("Kunci ", "")).join(", ");
-        p.text("KUNCI: " + k.toUpperCase(), W - 8, H - 12, C.amber, { align: "right", shadow: C.shadow });
+        const k = [...P.keys.values()].map((v) => t(v).replace(/^(Key|Kunci) /, "")).join(", ");
+        p.text(t("hud.keys") + k.toUpperCase(), W - 8, H - 12, C.amber, { align: "right", shadow: C.shadow });
       }
       // battery and stamina
       const bx = 8, by = H - 20, bw = 30, bh = 9, k = clamp(P.battery / 100);
-      p.text(P.light ? "LAMPU" : touch ? "LAMPU (MATI)" : "LAMPU (F)", bx, by - 8, C.dim, { shadow: C.shadow });
+      p.text(t(P.light ? "hud.light" : touch ? "hud.lightOff" : "hud.lightF"), bx, by - 8, C.dim, { shadow: C.shadow });
       p.rect(bx, by, bw, bh, C.dim);
       p.rect(bx + 1, by + 1, bw - 2, bh - 2, C.shadow);
       p.rect(bx + bw, by + 3, 2, 3, C.dim);
@@ -1229,9 +1241,9 @@ function updateHud(dt) {
         p.rect(bx, by + bh + 3, Math.round((bw * P.stamina) / 100), 2, C.ink, 0.8);
       }
       if (P.mode === "hide") {
-        p.text(touch ? "GUNA - KELUAR" : "E - KELUAR", W / 2, H - 30, C.ink, { align: "center", outline: C.shadow });
+        p.text(t(touch ? "hud.outTouch" : "hud.out"), W / 2, H - 30, C.ink, { align: "center", outline: C.shadow });
       } else if (P.mode === "walk" && focus) {
-        const txt = (touch ? "GUNA - " : "E - ") + promptFor(focus).toUpperCase();
+        const txt = (touch ? t("hud.useTouch") : "E - ") + promptFor(focus).toUpperCase();
         p.text(txt, W / 2, Math.round(H * 0.62), C.ink, { align: "center", outline: C.shadow });
       }
       if (P.mode === "walk") p.rect(Math.floor(W / 2), Math.floor(H / 2), 1, 1, C.ink, 0.35);
@@ -1320,6 +1332,7 @@ function pause() {
   if (state !== "play") return;
   state = "paused";
   input.f = input.b = input.l = input.r = 0;
+  renderJournal();
   showScreen("pause");
   sound.suspend();
 }
@@ -1338,15 +1351,15 @@ function begin(n, opts) {
 }
 function refreshTitle() {
   const n = Math.min(7, progress.night);
-  $("startBtn").textContent = n > 1 ? `MASUK · MALAM ${n}` : "MASUK";
+  $("startBtn").textContent = n > 1 ? t("ui.startN", { n }) : t("ui.start");
   const box = $("nightPick");
   box.innerHTML = "";
   for (let i = 1; i <= 7; i++) {
     const b = document.createElement("button");
     b.textContent = String(i);
     b.disabled = i > n;
-    b.title = NIGHTS[i - 1].title;
-    b.setAttribute("aria-label", `Malam ${i}: ${NIGHTS[i - 1].title}`);
+    b.title = t(NIGHTS[i - 1].title);
+    b.setAttribute("aria-label", `${t("ui.night", { n: i })}: ${t(NIGHTS[i - 1].title)}`);
     b.addEventListener("click", () => showDay(i));
     box.appendChild(b);
   }
@@ -1360,7 +1373,89 @@ $("nameInput").addEventListener("input", (e) => {
   playerName = e.target.value.slice(0, 18);
   store.set("name", playerName);
 });
-$("startBtn").addEventListener("click", () => showDay(Math.min(7, progress.night)));
+$("startBtn").addEventListener("click", () => {
+  const n = Math.min(7, progress.night);
+  if (n === 1 && !store.get("prologue", false)) return playPrologue();
+  showDay(n);
+});
+$("prologueBtn").addEventListener("click", () => playPrologue());
+function playPrologue() {
+  sound.start();
+  playCards(PROLOGUE, () => {
+    store.set("prologue", true);
+    showDay(1);
+  });
+}
+
+// ---------------------------------------------------------------- story cards: the prologue and the ending
+function playCards(cards, done) {
+  let i = 0;
+  state = "cards";
+  document.exitPointerLock?.();
+  const name = (playerName || t("ui.namePh")).toUpperCase();
+  const show = () => {
+    const [head, small, style] = cards[i];
+    const box = $("cardBox");
+    box.className = "cardbox " + (style ?? "");
+    $("cardHead").textContent = t(head, { name });
+    $("cardSmall").textContent = t(small, { name });
+    $("cardStep").textContent = `${i + 1} / ${cards.length}`;
+    $("cardNext").textContent = t(i === cards.length - 1 ? "ui.continue" : "ui.next");
+    box.classList.remove("in");
+    void box.offsetWidth;
+    box.classList.add("in");
+    sound.play("click");
+  };
+  $("cardNext").onclick = () => (++i >= cards.length ? done() : show());
+  $("cardSkip").onclick = () => done();
+  show();
+  showScreen("cards");
+}
+
+// ---------------------------------------------------------------- the journal, in the pause menu
+function renderJournal() {
+  const n = night?.n ?? 1;
+  const known = KNOWN[n] ?? [];
+  $("jKnow").innerHTML = known.length ? known.map((k) => `<li>${t(k)}</li>`).join("") : `<li class="none">${t("ui.nothingKnown")}</li>`;
+  const seen = store.get("notes", []);
+  const box = $("jNotes");
+  box.innerHTML = "";
+  if (!seen.length) box.innerHTML = `<span class="none">${t("ui.noNotes")}</span>`;
+  for (const id of NOTES.filter((x) => seen.includes(x))) {
+    const b = document.createElement("button");
+    b.className = "ghost";
+    b.textContent = t(`note.${id}.t`);
+    b.addEventListener("click", () => {
+      $("noteTitle").textContent = t(`note.${id}.t`);
+      $("noteText").textContent = t(`note.${id}`);
+      $("note").hidden = false;
+    });
+    box.appendChild(b);
+  }
+}
+
+// ---------------------------------------------------------------- languages
+function applyStatic() {
+  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll("[data-i18n-ph]")) el.placeholder = t(el.dataset.i18nPh);
+  for (const b of document.querySelectorAll("#langRow button")) b.setAttribute("aria-pressed", String(b.dataset.lang === lang()));
+}
+for (const l of LANGS) {
+  const b = document.createElement("button");
+  b.className = "ghost";
+  b.dataset.lang = l.id;
+  b.textContent = l.name;
+  b.addEventListener("click", () => {
+    setLang(l.id);
+    applyStatic();
+    refreshTitle();
+    // signs and labels in the hotel are in the chosen language too
+    buildTitleHotel();
+  });
+  $("langRow").appendChild(b);
+}
+document.documentElement.lang = lang();
+applyStatic();
 $("resumeBtn").addEventListener("click", resume);
 $("restartBtn").addEventListener("click", () => begin(night.n));
 $("menuBtn").addEventListener("click", toTitle);
@@ -1476,10 +1571,17 @@ if (touch) {
 } else for (const el of document.querySelectorAll(".mob")) el.hidden = true;
 
 // the title: the dark lobby, slowly turning
-hotel = new Hotel(scene);
-hotel.buildRain();
-bayang = new Bayang(hotel, {});
-bayang.reset({ active: false });
+function buildTitleHotel() {
+  if (hotel) {
+    hotel.root.traverse((o) => o.geometry?.dispose());
+    scene.remove(hotel.root);
+  }
+  hotel = new Hotel(scene);
+  hotel.buildRain();
+  bayang = new Bayang(hotel, {});
+  bayang.reset({ active: false });
+}
+buildTitleHotel();
 night = NIGHTS[0];
 Object.assign(P, { floor: "G", x: 12.5 * T, z: 6.2 * T, yaw: 0, pitch: -0.05, mode: "walk" });
 refreshTitle();
