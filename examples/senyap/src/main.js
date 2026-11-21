@@ -13,7 +13,7 @@ import { T, LEVEL_GAP, FLOOR, FLOOR_ORDER, FLOOR_NAME, ARRIVE, START } from "./d
 import { NIGHTS, NOTES, KNOWN, PROLOGUE, EPILOGUE } from "./data/story.js";
 import { t, lang, setLang, LANGS } from "./i18n.js";
 import { Hotel } from "./world.js";
-import { Bayang, BLOOD } from "./bayang.js";
+import { Bayang, BLOOD, FACE, body as bayangBody } from "./bayang.js";
 import { Sound } from "./audio.js";
 
 const EYE = 1.6;
@@ -161,6 +161,9 @@ const P = {
 let tasks = [], timers = [], handlers = {}, ringing = {}, loops = {}, log = [], time = 0, clockMin = SHIFT_START, clockStopped = null;
 let heartT = 0, caughtT = 0, endFx = [], screenFx = null, bannerFx = null, nearLift = {}, dragCapT = 0, checkpointData = null;
 let pending = 0;
+// how far behind on objectives the guard is: 0 calm .. 3 it's coming
+let threat = 0, dreadT = 20, phantom = null, gates = {}, subliminal = 0, caughtFrom = null, whispered = false;
+const LIMITS = { memo: 60, write: 75, power: 150, cctv: 60, lift: 60, r317: 150, k207: 45, kmaint: 150, kexit: 150, escape: 120 };
 let cctvIdx = 0, monitorT = 0, monitorCam = 0, humOn = true, focus = null;
 
 const night_ = (n) => NIGHTS[n - 1];
@@ -295,8 +298,14 @@ function makeCtx(n, flags, resume) {
       };
       c.on(evt, w);
     },
-    task(id, text) {
-      if (!tasks.find((q) => q.id === id)) tasks.push({ id, text, done: false, at: time });
+    task(id, text, o = {}) {
+      if (tasks.find((q) => q.id === id)) return;
+      const base = o.limit ?? LIMITS[id] ?? (id.startsWith("punch_") ? 90 : 100);
+      tasks.push({ id, text, done: false, at: time, urgent: !!o.urgent, limit: base * (night.pace ?? 1), started: null, missed: 0 });
+    },
+    // an object that belongs to a task only works while that task is the current one
+    gate(target, taskId) {
+      gates[target] = taskId;
     },
     done(id) {
       const q = tasks.find((q) => q.id === id);
@@ -447,7 +456,7 @@ function checkReady() {
     return;
   }
   if (tasks.length && tasks.every((t) => t.done)) {
-    tasks.push({ id: "write", text: "task.write", done: false, at: time });
+    tasks.push({ id: "write", text: "task.write", done: false, at: time, limit: LIMITS.write, started: null, missed: 0 });
     sub(t("s.allDone"), 3, "say");
   }
 }
@@ -522,6 +531,11 @@ function startNight(n, { fromCheckpoint = false } = {}) {
   loops = {};
   log = [];
   pending = 0;
+  threat = 0;
+  dreadT = 25;
+  gates = {};
+  whispered = false;
+  sound.duck(1, 0.2);
   time = 0;
   humOn = true;
   nearLift = {};
@@ -547,6 +561,11 @@ function startNight(n, { fromCheckpoint = false } = {}) {
     onListen: () => {},
   });
   bayang.reset(night.bayang);
+  phantom = bayangBody();
+  phantom.fire.sprite.visible = false;
+  phantom.g.visible = false;
+  phantom.t = 0;
+  hotel.root.add(phantom.g);
   const flags = cp ? { ...cp.flags } : {};
   ctx = makeCtx(n, flags, !!cp);
   const [f, x, y, yaw] = cp ? cp.at : night.start === "sofa" ? START.sofa : START.post;
@@ -600,6 +619,103 @@ function promptFor(it) {
   return t(it.label ?? "pr.look");
 }
 
+// ---------------------------------------------------------------- objectives in order, against the clock
+// urgent ones (a call from a room, the lift) jump the queue; everything else goes in the order it was given
+function activeTask() {
+  return tasks.find((q) => !q.done && q.urgent) ?? tasks.find((q) => !q.done) ?? null;
+}
+/** The task that owns this object, if it isn't the current one yet. */
+function outOfOrder(id) {
+  const owner = gates[id] ?? (id.startsWith("punch_") ? id : id === "logbook" ? "write" : null);
+  if (!owner) return null;
+  const q = tasks.find((x) => x.id === owner);
+  if (!q || q.done) return null;
+  const a = activeTask();
+  return a && a.id !== owner ? a : null;
+}
+function updateObjectives(dt) {
+  const a = activeTask();
+  if (!a) return;
+  if (a.started === null) a.started = time;
+  if (time - a.started < a.limit) return;
+  // out of time: it still has to be done, but everything gets worse
+  a.missed++;
+  a.started = time;
+  threat = Math.min(3, threat + 1);
+  sound.play("stinger");
+  sound.play("whisper", sound.at(camera.position.clone().add(new THREE.Vector3(Math.sin(P.yaw) * 1.2, 0, Math.cos(P.yaw) * 1.2))), { vol: 0.5 });
+  sub(t(`s.missed${threat}`) + " " + t("s.stillDo"), 4, "say");
+  post.uniforms.flash.value = 0.5;
+  bayang.escalate(threat, { floor: P.floor, x: P.x, z: P.z }, night.floors.filter((f) => f !== "3" || night.floors.includes("3")));
+  dreadT = Math.min(dreadT, 3);
+}
+
+// the hotel when you fall behind: lights stutter, doors slam, a phone rings twice, breath behind you,
+// and something tall standing where the corridor ends
+function dread(dt) {
+  if (threat <= 0 || P.mode === "cctv") return;
+  for (const l of Object.values(hotel.lights)) if (l.floor === P.floor) l.flicker = Math.random() < 0.002 * threat ? !l.flicker : l.flicker;
+  dreadT -= dt;
+  if (dreadT > 0) return;
+  dreadT = Math.max(7, 26 - threat * 6) + Math.random() * 8;
+  const roll = Math.random();
+  const here = { floor: P.floor, x: P.x / T, y: P.z / T };
+  if (roll < 0.25) {
+    const open = hotel.doors.filter((d) => d.floor === P.floor && d.open && !d.hidden && Math.hypot((d.x + 0.5) * T - P.x, (d.y + 0.5) * T - P.z) < 14 && !(Math.floor(P.x / T) === d.x && Math.floor(P.z / T) === d.y));
+    const d = open[Math.floor(Math.random() * open.length)];
+    if (d) {
+      d.open = false;
+      sfx("slam", { floor: d.floor, x: d.x + 0.5, y: d.y + 0.5, h: 1.2 });
+    } else sfx("knock", ctx.behind(2.5));
+  } else if (roll < 0.45) {
+    const b = ctx.behind(0.9);
+    sound.play("whisper", sound.at(hotel.pos(b.floor, b.x, b.y, 1.6)), { vol: 0.45 });
+    sub(`[${t("cap.breathBehind")}]`, 2.4, "caption");
+  } else if (roll < 0.6) {
+    const phones = hotel.interactables.filter((i) => i.kind === "phone" && i.floor === P.floor && !ringing[i.id]);
+    const ph = phones[Math.floor(Math.random() * phones.length)];
+    if (ph) {
+      const h = sound.ring(sound.at(ph.pos, muffleTo(where(ph.id))));
+      setTimeout(() => h.stop(), 3500);
+      sub(`[${t("cap.ringOnce")} ${dirWord(where(ph.id))}]`, 3, "caption");
+    }
+  } else if (threat >= 2 || roll < 0.8) showPhantom();
+  else for (const l of Object.values(hotel.lights)) if (l.floor === P.floor) l.flicker = true;
+  void here;
+}
+function showPhantom() {
+  if (!phantom || phantom.g.visible || (bayang.active && bayang.floor === P.floor)) return;
+  // stand it far down the line of sight, where the light barely reaches
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  for (let d = 12; d >= 6; d -= 1) {
+    const x = P.x + fx * d, z = P.z + fz * d;
+    if (hotel.blocked(P.floor, x, z, 0.35) || !hotel.clearLine(P.floor, P.x, P.z, x, z)) continue;
+    phantom.g.position.set(x, hotel.levelY(P.floor), z);
+    phantom.g.rotation.y = Math.atan2(P.x - x, P.z - z) + Math.PI;
+    phantom.g.visible = true;
+    phantom.t = 0.5 + Math.random() * 0.6;
+    phantom.floor = P.floor;
+    return;
+  }
+}
+function updatePhantom(dt) {
+  if (!phantom?.g.visible) return;
+  phantom.t -= dt;
+  const lit = P.light && P.battery > 0 && (() => {
+    const f = camera.getWorldDirection(new THREE.Vector3());
+    const to = phantom.g.position.clone().setY(camera.position.y).sub(camera.position).normalize();
+    return to.dot(f) > Math.cos(0.3);
+  })();
+  phantom.neck.rotation.z = Math.sin(time * 30) * 0.15;
+  if (phantom.t <= 0 || lit || phantom.floor !== P.floor) {
+    if (lit) {
+      sub(`[${t("cap.figure")}]`, 2.2, "caption");
+      sound.play("whisper", null, { vol: 0.3 });
+    }
+    phantom.g.visible = false;
+  }
+}
+
 function interact() {
   if (state !== "play") return;
   if (P.mode === "read") return closeNote();
@@ -609,6 +725,12 @@ function interact() {
   const it = focus;
   if (!it) return;
   if (it.kind === "door") return useDoor(it.door);
+  // objects that belong to a later objective wait their turn
+  const before = outOfOrder(it.id);
+  if (before) {
+    sound.play("click");
+    return sub(t("s.notActive", { task: t(before.text).toLowerCase() }), 3, "say");
+  }
   if (it.kind === "item") return takeItem(it);
   if (it.kind === "phone" && ringing[it.id]) return answer(it.id);
   if (it.kind === "lift") return callLift(it.floor);
@@ -860,13 +982,17 @@ function caught() {
   }
   $("note").hidden = true;
   $("chooser").hidden = true;
-  sound.play("scream");
+  $("hint").hidden = true;
+  for (const q of subsQueue) q.el.remove();
+  subsQueue = [];
+  for (const r of Object.values(ringing)) r.handle.stop();
   document.exitPointerLock?.();
-  const W = hudFrame.w, H = hudFrame.h;
-  endFx = [
-    { fx: createFx(darkExplosion, { palette: BLOOD, seed: 2, x: W / 2, y: H + 12 }), delay: 0.7 },
-    { fx: createFx(necroSkulls, { palette: BLOOD, seed: 7, x: W / 2, y: H - 8 }), delay: 1.0 },
-  ];
+  // first, nothing: the world goes silent and dark, and your head turns toward it by itself
+  sound.duck(0, 0.04);
+  caughtFrom = { yaw: P.yaw, to: Math.atan2(-(bayang.x - P.x), -(bayang.z - P.z)) };
+  whispered = false;
+  subliminal = 0;
+  endFx = [];
   screenFx = null;
 }
 function failShift(text) {
@@ -948,7 +1074,7 @@ function updatePlayer(dt) {
     }
   }
   const on = P.light && P.battery > 0;
-  if (on) P.battery = Math.max(0, P.battery - dt * (0.55 + (bayang.lit > 0 ? 2.6 : 0)));
+  if (on) P.battery = Math.max(0, P.battery - dt * (0.55 * (1 + 0.15 * threat) + (bayang.lit > 0 ? 2.6 : 0)));
   if (P.light && P.battery <= 0 && !P.flat) {
     P.flat = true;
     sub(t("s.flat"), 3, "say");
@@ -1030,6 +1156,9 @@ renderer.setAnimationLoop(() => {
       if (r.auto !== null && r.t >= r.auto) answer(id);
     }
     updatePlayer(dt);
+    updateObjectives(dt);
+    dread(dt);
+    updatePhantom(dt);
     focus = findFocus();
     const pinfo = {
       floor: P.floor,
@@ -1046,7 +1175,8 @@ renderer.setAnimationLoop(() => {
 
     // fear, flashlight, sound
     const vis = bayang.active && bayang.floor === P.floor;
-    const fear = vis ? clamp(1 - b.dist / 16) * 0.8 + (bayang.hunting ? 0.2 : 0) : 0;
+    // falling behind keeps a floor of dread under everything
+    const fear = Math.max(vis ? clamp(1 - b.dist / 16) * 0.8 + (bayang.hunting ? 0.2 : 0) : 0, threat * 0.14);
     fearV = lerp(fearV, fear, dt * 2);
     post.uniforms.fear.value = P.mode === "cctv" ? 0 : fearV;
     post.uniforms.glitch.value = vis && bayang.lit > 0 ? 0.25 + bayang.lit * 0.15 : Math.max(0, post.uniforms.glitch.value - dt * 2);
@@ -1080,36 +1210,92 @@ renderer.setAnimationLoop(() => {
     sound.bayang(bpos, { moving: bayang.moving, present: bayang.active && adjacent, muffle: bm, hunting: bayang.hunting });
     // the drag is its one honest cue: caption it when it's close and out of sight
     dragCapT -= dt;
-    if (bayang.active && bayang.moving > 0 && bayang.floor === P.floor && b.dist < 13 && dragCapT <= 0 && !bayang.onScreen(pinfo)) {
+    if (state === "play" && bayang.active && bayang.moving > 0 && bayang.floor === P.floor && b.dist < 13 && dragCapT <= 0 && !bayang.onScreen(pinfo)) {
       dragCapT = 7;
       sub(`[${t("cap.drag")} ${dirWord({ floor: bayang.floor, pos: bpos })}]`, 2.5, "caption");
     }
     sound.listen(camera);
   } else if (state === "caught") {
+    // the jumpscare, in beats: silence and the forced turn (0-0.55), the face and the scream (0.55-1.8),
+    // a cut to black and dead silence, a flat tone, and your name, whispered
+    const before = caughtT;
     caughtT += dt;
-    const g = bayang.g, fwd = new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
+    const at = (x) => before < x && caughtT >= x;
+    const g = bayang.g, y0 = hotel.levelY(P.floor);
     bayang.floor = P.floor;
     g.visible = true;
-    const k = clamp(caughtT / 0.25);
-    g.position.set(P.x + fwd.x * lerp(1.8, 0.8, k), hotel.levelY(P.floor) + lerp(-0.4, -0.85, k), P.z + fwd.z * lerp(1.8, 0.8, k));
-    g.rotation.y = Math.atan2(P.x - g.position.x, P.z - g.position.z) + Math.PI;
-    P.pitch = lerp(P.pitch, 0.04, dt * 10);
-    camera.position.set(P.x + (Math.random() - 0.5) * 0.06, hotel.levelY(P.floor) + EYE + (Math.random() - 0.5) * 0.05, P.z);
-    camera.rotation.set(P.pitch, P.yaw, (Math.random() - 0.5) * 0.08);
-    bayang.parts.neck.rotation.set((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 1.2);
-    bayang.parts.arms[0].rotation.x = -1.6;
-    bayang.parts.arms[1].rotation.x = -1.4;
-    flashlight.intensity = Math.random() < 0.5 ? 70 : 0;
-    post.uniforms.glitch.value = 1;
-    post.uniforms.fear.value = 1;
-    post.uniforms.flash.value = Math.random() < 0.2 ? 1 : post.uniforms.flash.value * 0.8;
-    if (caughtT > 1.5 && !screenFx) screenFx = createFx(crtOff, { color: "#000000", seed: 2, palette: BLOOD });
-    if (caughtT > 1.5) post.uniforms.dark.value = Math.max(0, post.uniforms.dark.value - dt * 2);
-    if (caughtT > 3.2) {
+    const fwd = () => new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
+    if (caughtT < 0.55) {
+      let d = caughtFrom.to - caughtFrom.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      P.yaw = caughtFrom.yaw + d * (1 - (1 - clamp(caughtT / 0.45)) ** 3);
+      P.pitch = lerp(P.pitch, 0.05, dt * 6);
+      flashlight.intensity = 0;
+      post.uniforms.dark.value = lerp(post.uniforms.dark.value, 0.35, dt * 8);
+      post.uniforms.glitch.value = 0;
+      post.uniforms.fear.value = 0.6;
+      const f = fwd();
+      g.position.set(P.x + f.x * 2.6, y0 - 0.2, P.z + f.z * 2.6);
+      bayang.parts.face.visible = false;
+    } else {
+      if (at(0.55)) {
+        sound.duck(1, 0.005);
+        sound.play("impact");
+        sound.play("scream");
+        post.uniforms.flash.value = 1;
+        post.uniforms.dark.value = 1;
+        bayang.parts.face.visible = true;
+      }
+      // it is in your face, then lunges closer still
+      const f = fwd(), close = caughtT < 1.25 ? lerp(0.95, 0.62, clamp((caughtT - 0.55) / 0.15)) : lerp(0.62, 0.36, clamp((caughtT - 1.25) / 0.12));
+      g.position.set(P.x + f.x * close, y0 - 0.78 + (Math.random() - 0.5) * 0.03, P.z + f.z * close);
+      g.rotation.y = Math.atan2(P.x - g.position.x, P.z - g.position.z) + Math.PI;
+      // the neck twists further than a neck should, in jerks
+      const twist = Math.min(1.5, Math.floor((caughtT - 0.55) * 7) * 0.18);
+      bayang.parts.neck.rotation.set((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.2, twist + (Math.random() - 0.5) * 0.15);
+      bayang.parts.arms[0].rotation.x = -1.7;
+      bayang.parts.arms[1].rotation.x = -1.5;
+      P.pitch = lerp(P.pitch, 0.02, dt * 10);
+      flashlight.intensity = caughtT < 1.8 ? (Math.random() < 0.75 ? 90 : 4) : 0;
+      post.uniforms.glitch.value = caughtT < 1.8 ? 0.7 + Math.random() * 0.3 : 0;
+      post.uniforms.fear.value = 1;
+      post.uniforms.flash.value = Math.random() < 0.15 ? 0.9 : post.uniforms.flash.value * 0.8;
+      // single frames of the face, full screen: there and gone before you're sure you saw it
+      subliminal = [[0.7, 0.76], [1.02, 1.07], [1.4, 1.46]].some(([a, b]) => caughtT >= a && caughtT < b) ? 1 : 0;
+      if (at(1.8)) {
+        // cut: black, and nothing at all
+        sound.duck(0, 0.004);
+        post.uniforms.dark.value = 0;
+        bayang.parts.face.visible = false;
+        g.visible = false;
+        screenFx = createFx(crtOff, { color: "#000000", seed: 2, palette: BLOOD });
+      }
+      if (caughtT >= 1.8) {
+        post.uniforms.dark.value = 0;
+        g.visible = false;
+      }
+      if (at(2.5)) {
+        sound.duck(1, 0.3);
+        sound.play("tinnitus");
+        sound.play("flatline");
+      }
+      if (at(3.4) && !whispered) {
+        whispered = true;
+        const nm = (playerName || t("ui.namePh")).toUpperCase();
+        sound.voice(nm, "whisper", sound.at(camera.position.clone().add(new THREE.Vector3(Math.cos(P.yaw) * 0.4, 0, -Math.sin(P.yaw) * 0.4))));
+        sub(`...${nm}...`, 2.6, "whisper");
+      }
+    }
+    camera.position.set(P.x + (Math.random() - 0.5) * (caughtT > 0.55 && caughtT < 1.8 ? 0.08 : 0.004), y0 + EYE + (Math.random() - 0.5) * 0.04, P.z);
+    camera.rotation.set(P.pitch, P.yaw, caughtT > 0.55 && caughtT < 1.8 ? (Math.random() - 0.5) * 0.1 : 0);
+    if (caughtT > 5.4) {
       state = "dead";
+      subliminal = 0;
       $("deadTitle").textContent = t("ui.caught");
       $("deadText").textContent = t("ui.caughtText", { n: night.n, time: clockText(), done: tasks.filter((q) => q.done).length, all: tasks.length });
       $("deadTag").textContent = t(night.n === 7 ? "ui.caughtTag7" : "ui.caughtTag");
+      const now = new Date();
+      $("deadReal").textContent = t("ui.realTime", { time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}` });
       $("retryBtn").textContent = t(checkpointData?.night === night.n ? "ui.retryCp" : "ui.retry");
       showScreen("dead");
     }
@@ -1214,13 +1400,32 @@ function updateHud(dt) {
       // objectives: what's left, and what just got done
       let y = 18;
       const width = Math.min(150, W * 0.55);
-      for (const q of tasks) {
-        if (q.done && time - q.at > 4) continue;
+      // the threat level, if any, next to the clock
+      if (threat > 0) {
+        const tx = 8 + p.measure(nl)[0] + 6 + p.measure(clockText())[0] + 8;
+        const on = threat >= 3 ? Math.floor(time * 4) % 2 : 1;
+        if (on) p.text(t("hud.threat", { 0: "" }).replace("{0}", "").trim(), tx, 7, C.red, { shadow: C.shadow });
+        const tw = p.measure(t("hud.threat").replace("{0}", "").trim())[0];
+        for (let i = 0; i < 3; i++) p.rect(tx + tw + 4 + i * 5, 8, 3, 4, i < threat ? C.red : C.dim, i < threat ? 1 : 0.5);
+      }
+      // the current objective, bright and against the clock; the rest queued and dim; just-done in green
+      const act = activeTask();
+      const order = [...tasks.filter((q) => q.done && time - q.at <= 4), ...(act ? [act] : []), ...tasks.filter((q) => !q.done && q !== act)];
+      for (const q of order) {
+        const isAct = q === act, queued = !q.done && !isAct;
         const lines = wrap(p, t(q.text), width - 8);
-        p.rect(8, y + 1, 3, 3, q.done ? C.green : q.id === "write" ? C.amber : C.ink, q.done ? 1 : 0.9);
-        lines.forEach((l, i) => p.text(l, 14, y + i * 7, q.done ? C.dim : q.id === "write" ? C.amber : C.ink, { shadow: C.shadow }));
+        const col = q.done ? C.dim : queued ? C.dim : q.id === "write" ? C.amber : C.ink;
+        p.rect(8, y + 1, 3, 3, q.done ? C.green : queued ? C.dim : col, queued ? 0.5 : 1);
+        lines.forEach((l, i) => p.text(l, 14, y + i * 7, col, { shadow: C.shadow }));
+        if (isAct && q.started !== null) {
+          const left = Math.max(0, q.limit - (time - q.started));
+          const mm = Math.floor(left / 60), ss = Math.floor(left % 60);
+          const late = left < 15 || q.missed > 0;
+          if (!late || Math.floor(time * 3) % 2 || left > 5) p.text(`${mm}:${String(ss).padStart(2, "0")}`, 14, y + lines.length * 7, late ? C.red : C.teal, { shadow: C.shadow });
+          y += 7;
+        }
         y += lines.length * 7 + 3;
-        if (y > H * 0.5) break;
+        if (y > H * 0.55) break;
       }
       // keys held
       if (P.keys.size) {
@@ -1249,7 +1454,7 @@ function updateHud(dt) {
       if (P.mode === "walk") p.rect(Math.floor(W / 2), Math.floor(H / 2), 1, 1, C.ink, 0.35);
     }
   }
-  if (state === "caught")
+  if (state === "caught" && false)
     for (const e of endFx) {
       if (e.delay > 0) {
         e.delay -= 1 / 30;
@@ -1265,6 +1470,14 @@ function updateHud(dt) {
   }
   composite(hudFrame, hudImg.data, null);
   hudCtx.putImageData(hudImg, 0, 0);
+  if (state === "caught" && subliminal) {
+    // the face, filling the screen for a frame
+    hudCtx.imageSmoothingEnabled = false;
+    const fh = H * 1.05, fw = (fh * FACE.width) / FACE.height;
+    hudCtx.globalAlpha = 0.92;
+    hudCtx.drawImage(FACE, (W - fw) / 2 + (Math.random() - 0.5) * 8, (H - fh) / 2, fw, fh);
+    hudCtx.globalAlpha = 1;
+  }
   clearFrame(fxFrame);
   if (screenFx) {
     screenFx.update(1 / 30);
@@ -1625,6 +1838,9 @@ window.__hotel = {
   },
   set clock(v) {
     clockMin = v;
+  },
+  get threat() {
+    return threat;
   },
   set speed(v) {
     timeScale = v;

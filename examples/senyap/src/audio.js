@@ -41,6 +41,12 @@ export class Sound {
     this.volume = v;
     if (this.master) this.master.gain.setTargetAtTime(v, this.t, 0.05);
   }
+  /** Pull everything down to k of the volume (0 is dead silence), over about tc seconds. */
+  duck(k, tc = 0.03) {
+    if (!this.master) return;
+    this.master.gain.cancelScheduledValues(this.t);
+    this.master.gain.setTargetAtTime(this.volume * k, this.t, tc);
+  }
   suspend() {
     this.ctx?.suspend();
   }
@@ -549,6 +555,43 @@ export class Sound {
     n.connect(ng).connect(ws);
     n.start(t, 0, 2.4);
     this.out(g, 0.5);
+  }
+  // a heart monitor's flat tone, thin and far away
+  s_flatline() {
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.t;
+    o.frequency.value = 988;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.07, t + 0.05);
+    g.gain.setValueAtTime(0.07, t + 2.2);
+    g.gain.linearRampToValueAtTime(0, t + 2.6);
+    o.connect(g);
+    this.out(g, 0.3);
+    o.start(t);
+    o.stop(t + 2.7);
+  }
+  // the ringing in your ears after something too loud
+  s_tinnitus() {
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.t;
+    o.frequency.value = 6200;
+    g.gain.setValueAtTime(0.03, t);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 3.5);
+    o.connect(g);
+    this.out(g, 0);
+    o.start(t);
+    o.stop(t + 3.6);
+  }
+  // a deep hit, felt more than heard
+  s_impact() {
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.t;
+    o.frequency.setValueAtTime(90, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 0.6);
+    g.gain.setValueAtTime(1.2, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    o.connect(g);
+    this.out(g, 0.4);
+    o.start(t);
+    o.stop(t + 1);
+    this.s_slam(null);
   }
   s_stinger() {
     const t = this.t, g = this.ctx.createGain();

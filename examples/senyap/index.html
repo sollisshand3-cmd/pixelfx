@@ -90,6 +90,9 @@
   .sub.say { color: var(--ink); }
   .sub.self { color: #b8c8d8; font-style: italic; }
   .sub.line { color: #ffe0c8; }
+  .sub.whisper { color: #c8201c; background: transparent; letter-spacing: 0.4em; font-size: 26px; }
+  .card > .ghost { align-self: center; }
+  .real { color: #6a5a50; font-size: 18px; font-style: italic; }
   #popup { position: fixed; top: calc(14% + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; background: rgba(0,0,0,0.75); border: 1px solid var(--brass); padding: 6px 18px 4px; }
   #popup.show { animation: pop 3.2s ease-out both; }
   #popTitle { color: var(--brass); font-size: 30px; letter-spacing: 0.06em; }
@@ -145,6 +148,7 @@
   .know ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 19px; color: var(--ink); }
   .know li.none, .know .none { color: var(--dim); list-style: none; margin-left: -18px; }
   .tonight p { color: var(--teal); }
+  .tonight p.timer { color: var(--dim); margin-top: 6px; }
   .journal { max-height: 34vh; overflow-y: auto; }
   .journal h3 + ul { margin-bottom: 10px; }
   #jNotes { justify-content: flex-start; }
@@ -244,7 +248,7 @@
       <h3 data-i18n="ui.know"></h3>
       <ul id="dayKnowList"></ul>
     </div>
-    <div class="tonight"><h3 data-i18n="ui.tonight"></h3><p id="dayTonightText"></p></div>
+    <div class="tonight"><h3 data-i18n="ui.tonight"></h3><p id="dayTonightText"></p><p class="small timer" data-i18n="ui.timerHint"></p></div>
     <p class="hintbox" id="dayHint" hidden></p>
     <button class="go" id="dayBtn">START SHIFT</button>
   </div>
@@ -288,6 +292,7 @@
     <h2 id="deadTitle"></h2>
     <p class="story" id="deadText"></p>
     <p class="tag" id="deadTag"></p>
+    <p class="real" id="deadReal"></p>
     <button class="go" id="retryBtn"></button>
     <button class="ghost" id="deadMenuBtn" data-i18n="ui.menu"></button>
   </div>

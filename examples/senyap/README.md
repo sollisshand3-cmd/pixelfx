@@ -32,6 +32,17 @@ found and what you did. A day screen with a message from the manager comes befor
 
 ## Playing
 
+- **Objectives come one at a time, each against the clock.** The current one is bright with a countdown;
+  the rest wait, dimmed, and their objects refuse to work ("Not yet. First: ...") so nothing can be skipped.
+  A call from a room jumps the queue. Miss a deadline and the objective still has to be done, but the
+  **threat** rises (1 to 3): Bayang gets faster, sees further, goes to where you are, and from threat 2 no
+  floor is safe even on nights it wasn't hunting. The hotel turns on you too: lights stutter, open doors slam,
+  phones ring twice and stop, breathing behind you, and a tall figure standing where the corridor ends.
+- **When it catches you:** the sound dies and the screen goes dark while your head turns toward it on its
+  own; then its face, a scream, single frames of the face across the whole screen, a neck twisting too far;
+  then a hard cut to silence, a flat heart-monitor tone, and your name, whispered. The game-over screen tells
+  you what time it is where you are.
+
 - **WASD** move, **mouse** look, **E** or **click** use (doors, phones, clocks, hiding, CCTV), **Shift** run
   (loud), **F** flashlight. On a phone: drag left to move, drag right to look, and the GUNA / LAMPU / LARI
   buttons.

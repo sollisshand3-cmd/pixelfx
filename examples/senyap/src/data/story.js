@@ -32,7 +32,9 @@ export function roomReport(ctx, o) {
     () => {
       ctx.ring(o.phone ?? "phone_pos", () => {
         ctx.lines(o.lines);
-        ctx.task(o.id, o.task);
+        // a call from a room comes first: it jumps the queue, and only its object counts until it's done
+        ctx.task(o.id, o.task, { urgent: true, limit: o.limit });
+        ctx.gate(o.target, o.id);
         ctx.arrived();
         if (o.door) ctx.door(o.door).lock(false);
         o.onAnswer?.();
@@ -69,6 +71,7 @@ export const NIGHTS = [
     title: "n1.title",
     day: { from: "name.rahman", text: "n1.day" },
     tonight: "n1.tonight",
+    pace: 1.5,
     floors: ["B", "G", "2"],
     bayang: { active: false },
     setup(ctx) {
@@ -113,6 +116,7 @@ export const NIGHTS = [
     title: "n2.title",
     day: { from: "name.rahman", text: "n2.day" },
     tonight: "n2.tonight",
+    pace: 1.3,
     floors: ["B", "G", "2"],
     bayang: { active: false },
     setup(ctx) {
@@ -208,6 +212,7 @@ export const NIGHTS = [
       common(ctx);
       patrol(ctx, ["3"]);
       ctx.task("power", "n4.task");
+      ctx.gate("breaker", "power");
       ctx.after(14, () => {
         ctx.power(false);
         ctx.say("n4.cut", 3);
@@ -268,7 +273,7 @@ export const NIGHTS = [
         ctx.bayang.staticFigure("3", 25, 5.5);
         ctx.after(1.2, () => ctx.say("n5.stare", 3.5));
         ctx.after(4, () => {
-          ctx.task("lift", "n5.lift");
+          ctx.task("lift", "n5.lift", { urgent: true });
           ctx.liftArrive("G");
           ctx.caption("cap.liftLobby", { floor: "G", x: 24, y: 3.5 });
         });
@@ -353,6 +358,10 @@ export const NIGHTS = [
       ctx.task("kmaint", "n7.kmaint");
       ctx.task("kexit", "n7.kexit");
       ctx.task("escape", "n7.escape");
+      ctx.gate("k207", "k207");
+      ctx.gate("uniform207", "kmaint");
+      ctx.gate("keyboard", "kexit");
+      ctx.gate("exitDoor", "escape");
       ctx.on("interact:mainDoor", () => (ctx.say("n7.mainDoor", 3.5), true));
 
       if (stage >= 2) {

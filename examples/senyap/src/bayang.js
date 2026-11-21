@@ -10,7 +10,56 @@ import * as shadowFlames from "../../../src/fx/shadow/shadow-flames.js";
 
 export const BLOOD = ["#050102", "#1a0306", "#3a060c", "#660a12", "#9a1420", "#d02a2a", "#ff6a50", "#ffd0c0"];
 
-function body() {
+// the face it shows when it catches you: drawn pixel by pixel, pale and stretched, with hollow eyes and a
+// mouth that hangs open too far. It stays hidden until the end.
+export const FACE = (() => {
+  const W = 32, H = 48, c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const put = (x, y, r, g, b, a = 255) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = (y * W + x) * 4;
+    d[i] = r;
+    d[i + 1] = g;
+    d[i + 2] = b;
+    d[i + 3] = a;
+  };
+  const inEllipse = (x, y, cx, cy, rx, ry) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      // a long pale head, narrowing to the chin
+      const rx = 13 - Math.max(0, y - 30) * 0.35;
+      if (!inEllipse(x, y, 15.5, 23, rx, 22)) continue;
+      const shade = 150 - Math.abs(x - 15.5) * 4 - Math.max(0, y - 34) * 3 + rnd() * 14;
+      put(x, y, shade * 0.92, shade * 0.88, shade * 0.8);
+      // veins and cracks
+      if (rnd() < 0.05) put(x, y, shade * 0.5, shade * 0.4, shade * 0.4);
+    }
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      // hollow eye sockets, long and black, with a pinprick of red
+      for (const ex of [10, 21])
+        if (inEllipse(x, y, ex, 17, 3.2, 5.5)) put(x, y, 6, 4, 4);
+      if ((x === 10 || x === 21) && (y === 18 || y === 19)) put(x, y, 255, 40, 20);
+      // the mouth, open far past where a jaw should stop
+      if (inEllipse(x, y, 15.5, 34, 5.5, 9)) put(x, y, 4, 2, 2);
+      // teeth along the top and bottom of it
+      if (inEllipse(x, y, 15.5, 34, 5.5, 9) && (Math.abs(y - 26) < 2 || Math.abs(y - 42) < 2) && x % 2 === 0) put(x, y, 196, 188, 160);
+      // black hair hanging over the sides
+      const hair = (x < 6 || x > 25) && y < 40 && rnd() < 0.85;
+      if (hair && inEllipse(x, y, 15.5, 23, 15, 24)) put(x, y, 8, 6, 6);
+      if (y < 5 && inEllipse(x, y, 15.5, 23, 13, 22)) put(x, y, 10, 8, 8);
+    }
+  // dark streaks running from the eyes
+  for (const ex of [10, 21]) for (let y = 23; y < 34; y++) if (rnd() < 0.8) put(ex + (y % 3 === 0 ? 1 : 0), y, 40, 6, 6);
+  ctx.putImageData(img, 0, 0);
+  return c;
+})();
+
+export function body() {
   const g = new THREE.Group(), skin = new THREE.MeshStandardMaterial({ color: 0x0c0a0b, roughness: 0.95 });
   const sheet = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 1, side: THREE.DoubleSide });
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 1.25, 7), skin);
@@ -23,6 +72,16 @@ function body() {
   head.scale.set(0.9, 1.35, 1);
   head.position.y = 0.2;
   neck.add(head);
+  // the face, hidden until it has you
+  const faceTex = new THREE.CanvasTexture(FACE);
+  faceTex.colorSpace = THREE.SRGBColorSpace;
+  faceTex.magFilter = faceTex.minFilter = THREE.NearestFilter;
+  faceTex.generateMipmaps = false;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.63), new THREE.MeshBasicMaterial({ map: faceTex, transparent: true, alphaTest: 0.5, fog: false }));
+  face.position.set(0, 0.2, -0.2);
+  face.rotation.y = Math.PI;
+  face.visible = false;
+  neck.add(face);
   const glow = glowTexture([255, 30, 20]);
   for (const s of [-1, 1]) {
     const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }));
@@ -57,7 +116,7 @@ function body() {
   });
   const fire = new FxSprite(shadowFlames, { palette: BLOOD, seed: 3 }, { scale: 1 / 45 });
   g.add(fire.sprite);
-  return { g, torso, neck, arms, cloth, fire };
+  return { g, torso, neck, arms, cloth, fire, face };
 }
 
 const centre = (i) => (i + 0.5) * T;
@@ -75,6 +134,9 @@ export class Bayang {
 
   reset(cfg) {
     this.cfg = { floors: ["G"], speed: 2.6, aggression: 0.4, ...cfg };
+    this.level = 0;
+    this.sightBonus = 0;
+    this.parts.face.visible = false;
     this.mode = !cfg.active ? "off" : cfg.dormant ? "dormant" : "patrol";
     this.path = [];
     this.repath = 0;
@@ -183,6 +245,34 @@ export class Bayang {
     this.travel(floor, via === "lift" ? "stairs" : via, via === "lift" ? 9 : 5.5, { search: true });
   }
 
+  /**
+   * An objective ran out of time: it gets faster, sees further, wanders less, and goes to where you are.
+   * level 1..3. On a night when it isn't hunting yet, level 2 wakes it on your floor.
+   */
+  escalate(level, p, floors) {
+    this.level = level;
+    this.cfg.speed = (this.cfg.baseSpeed ??= this.cfg.speed ?? 2.4) * (1 + 0.14 * level);
+    this.cfg.aggression = Math.min(0.95, (this.cfg.baseAggr ??= this.cfg.aggression ?? 0.4) + 0.2 * level);
+    this.sightBonus = level * 3;
+    this.floorTimer = Math.min(this.floorTimer, 40 - level * 8);
+    if (!this.cfg.active || this.mode === "off" || this.mode === "dormant") {
+      if (level < 2) return;
+      this.cfg.active = true;
+      this.cfg.floors = floors;
+      const a = ARRIVE[p.floor].lift ?? ARRIVE[p.floor].stairs;
+      this.place(p.floor, a[0], a[1]);
+      this.mode = "patrol";
+      this.g.visible = true;
+    }
+    // from level 2 no floor is safe
+    if (level >= 2 && !this.cfg.floors.includes(p.floor)) this.cfg.floors = [...this.cfg.floors, p.floor];
+    if (this.mode === "gone") this.timer = Math.min(this.timer, 4);
+    if (level >= 2 && this.mode !== "chase") {
+      if (this.floor === p.floor) this.investigate(p.floor, p.x / T, p.z / T, { listen: 2 });
+      else if (this.cfg.floors.includes(p.floor) && this.mode !== "travel") this.travel(p.floor, "stairs", 6 - level, { investigate: [p.x / T, p.z / T], listen: 2 });
+    }
+  }
+
   banish(player) {
     this.mode = "gone";
     this.timer = 14;
@@ -194,7 +284,7 @@ export class Bayang {
   sees(p) {
     if (p.floor !== this.floor || p.hidden) return false;
     const dx = p.x - this.x, dz = p.z - this.z, d = Math.hypot(dx, dz);
-    const range = p.light ? 15 : 6.5;
+    const range = (p.light ? 15 : 6.5) + (this.sightBonus ?? 0);
     if (d > range) return false;
     if (d > 2.5) {
       const a = Math.atan2(dx, dz) - this.heading;

@@ -471,6 +471,29 @@ const D = {
   // who says what
   "you": ["You", "Kamu", "Kamu"],
 
+
+  // ---------------------------------------------------------------- objectives against the clock
+  "s.notActive": ["Not yet. First: {task}.", "Belum lagi. Dahulukan: {task}.", "Belum. Selesaikan dulu: {task}."],
+  "s.missed1": ["Objective missed. The hotel noticed.", "Objektif terlepas. Hotel ini perasan.", "Objektif terlewat. Hotel ini menyadarinya."],
+  "s.missed2": ["Missed again. It knows where you are.", "Terlepas lagi. Ia tahu di mana kamu.", "Terlewat lagi. Ia tahu di mana kamu."],
+  "s.missed3": ["Out of time. It's coming for you.", "Masa kamu habis. Ia datang untuk kamu.", "Waktumu habis. Ia datang menjemputmu."],
+  "s.stillDo": ["It still has to be done.", "Ia tetap perlu diselesaikan.", "Tetap harus diselesaikan."],
+  "ui.timerHint": [
+    "Objectives come one at a time, each against the clock. Miss one and it still has to be done, but the hotel gets worse and Bayang gets hungrier.",
+    "Objektif datang satu demi satu, setiap satu ada had masa. Jika terlepas, ia tetap perlu diselesaikan, tetapi hotel menjadi lebih teruk dan Bayang lebih lapar.",
+    "Objektif datang satu per satu, masing-masing ada batas waktu. Jika terlewat, tetap harus diselesaikan, tapi hotel makin mencekam dan Bayang makin lapar.",
+  ],
+  "hud.threat": ["THREAT {0}", "ANCAMAN {0}", "ANCAMAN {0}"],
+  "ui.realTime": [
+    "Where you are, it's {time} as well. Don't look behind you.",
+    "Di tempat kamu sekarang pun pukul {time}. Jangan toleh ke belakang.",
+    "Di tempatmu sekarang juga pukul {time}. Jangan menoleh ke belakang.",
+  ],
+  "cap.slamNear": ["a door slams shut nearby", "pintu terhempas berdekatan", "pintu terbanting di dekatmu"],
+  "cap.breathBehind": ["breathing, right behind you", "nafas, betul-betul di belakang kamu", "napas, tepat di belakangmu"],
+  "cap.ringOnce": ["a phone rings twice, then stops", "telefon berdering dua kali, lalu berhenti", "telepon berdering dua kali, lalu berhenti"],
+  "cap.figure": ["something was standing there", "ada sesuatu berdiri di situ", "ada sesuatu berdiri di sana"],
+
   // ---- night 1
   "n1.title": ["First Shift", "Syif Pertama", "Shift Pertama"],
   "n1.day": [
